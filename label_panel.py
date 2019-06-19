@@ -57,7 +57,7 @@ class LabelPanel(QWidget):
 
         act_zoom_in = QAction("Zoom &In", self, shortcut="Ctrl+R",
                                       triggered=self.zoom_in)
-        act_zoom_out = QAction("Zoom &In", self, shortcut="Ctrl+F",
+        act_zoom_out = QAction("Zoom &Out", self, shortcut="Ctrl+F",
                                       triggered=self.zoom_out)
 
         self.addAction(act_zoom_in)
@@ -260,6 +260,19 @@ class LabelPanel(QWidget):
     def draw_point(self,painter, bbox):
         # painter.drawEllipse(bbox.center(), TEMP_SHAPE_LENGTH/2 * 1/self.scale, TEMP_SHAPE_LENGTH/2 * 1/self.scale)
         painter.drawEllipse(bbox.center(), bbox.width()//2, bbox.height()//2)
+
+
+    def wheelEvent(self,e):
+        modifiers = QApplication.keyboardModifiers()
+        delta = e.angleDelta()
+        if self.data is not None:
+            if modifiers and modifiers == Qt.ControlModifier:
+                delta = e.angleDelta()
+                if delta.y()>0:
+                    self.zoom_in()
+                elif delta.y()<0:
+                    self.zoom_out()
+
 
 
     def zoom_in(self):

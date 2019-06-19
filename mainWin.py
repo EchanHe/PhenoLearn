@@ -114,7 +114,9 @@ class MainWindow(QMainWindow):
         self.widget_point_list.currentItemChanged.connect(self.point_list_current_item_changed)
 
         self.widget_props_table = QTableWidget(len(prop_names),1)
+        self.widget_props_table.itemChanged.connect(self.prop_table_item_changed)
         self.widget_props_table.itemDoubleClicked.connect(self.prop_table_db_click)
+        # self.widget_props_table.currentItemChanged.connect(self.item_changed)
 
         self.widget_props_table.horizontalHeader().setVisible(False)
         self.widget_props_table.setVerticalHeaderLabels(prop_names)
@@ -145,6 +147,7 @@ class MainWindow(QMainWindow):
         self.scroll_area = QScrollArea()
         self.scroll_area.setBackgroundRole(QPalette.Dark)
         self.scroll_area.setWidget(self.widget_annotation)
+        self.scroll_area.viewport().installEventFilter(self)
         # self.scroll_area.setWidgetResizable(True)
         # self.scroll_area.setVisible(False)
 
@@ -321,13 +324,32 @@ class MainWindow(QMainWindow):
 
     def prop_table_db_click(self,item):
         print(item.text())
+        x = int(self.widget_props_table.item(1,0).text())
+        y = int(self.widget_props_table.item(2,0).text())
+
+        self.data.get_current_image().set_current_pt(x=x, y=y)
+        self.widget_annotation.update()
 
 
-    # def file_list_click(self,item):
-    #     print("single", item.text())
-    #
-    # def file_list_db_click(self,item):
-    #     print("double", item.text())
+
+    def prop_table_item_changed(self, item):
+        # Update data if any item is changed
+
+        if item is not None:
+            # Limit the
+            value = item.text()
+            if self.widget_props_table.row(item) ==1:
+                value=int(value)
+                self.data.get_current_image().set_current_pt(x=value)
+            if self.widget_props_table.row(item) ==2:
+                value=int(value)
+                self.data.get_current_image().set_current_pt(y=value)
+
+            self.widget_annotation.update()
+
+    def item_changed(self, cur, prev):
+        if prev is not None:
+            print("changed: ",cur.text() , prev.text())
 
     def file_list_current_item_changed(self,current,prev):
 
@@ -356,14 +378,23 @@ class MainWindow(QMainWindow):
 
     def point_list_current_item_changed(self,current,prev):
         print('change')
+        idx_pt = self.widget_point_list.currentRow()
+        self.widget_point_list.setCurrentRow(idx_pt)
 
-        # Select and highlight in properties
+        self.data.get_current_image().set_current_pt_id(idx_pt)
+        self.list_properties()
 
 
-        # print(current.row())
-        # Select current point
-        # Highlight the current point
+    def eventFilter(self, source, event):
 
+        modifiers = QApplication.keyboardModifiers()
+
+        if (event.type() == QEvent.Wheel and source is self.scroll_area.viewport()):
+            if modifiers and modifiers == Qt.ControlModifier:
+                return True
+
+
+        return False
 
 
 if __name__ == '__main__':

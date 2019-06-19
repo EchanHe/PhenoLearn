@@ -97,7 +97,12 @@ class Image():
         self.current_pt_id = idx
 
     def set_current_pt(self, pt_name = None,x= None,y=None, error = None,info = None, scale=1):
-        self.points[self.current_pt_id].set_point(pt_name = pt_name, x= x//scale, y=y//scale, error = error,info = info)
+        if y is not None:
+            y=y//scale
+        if x is not None:
+            x=x//scale
+
+        self.points[self.current_pt_id].set_point(pt_name = pt_name, x= x, y=y, error = error,info = info)
 
 
     def set_current_pt_x(self, x):
@@ -183,7 +188,9 @@ class Data():
         self.init_images()
 
     def set_scale(self,scale):
-        self.scale*=scale
+        temp = self.scale * scale
+        if temp <= 7* self.origin_scale and temp >= self.origin_scale/2:
+            self.scale=temp
 
     def reset_scale(self):
         self.scale = self.origin_scale
