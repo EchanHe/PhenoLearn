@@ -1,3 +1,5 @@
+#!/usr/bin/python3
+# -*- coding: utf-8 -*-
 
 from PyQt5.QtCore import *
 from PyQt5.QtGui import QPixmap
@@ -8,18 +10,16 @@ from math import ceil
 
 TEMP_SHAPE_LENGTH =111
 
-pixmap_size_limit = QSize(1300,700)
-
+pixmap_max_size_limit = QSize(1300,700)
+pixmap_min_size_limit = QSize(400,200)
 
 class Point():
-    def __init__(self, pt_name, x, y, width = TEMP_SHAPE_LENGTH, error = False,info = None):
-        self.pt_name = pt_name
-        self.x = x
-        self.y = y
-        self.info = info
-        self.error = error
+    def __init__(self, pt_name, x, y, width = 10, error = False,info = None, absence = False):
 
-        self.set_rect(self.x,self.y, width, width)
+
+        self.set_point(pt_name,x,y,width,error=error,info=info,absence=absence)
+
+
 
 
     def set_rect(self,cx,cy,width,height):
@@ -29,23 +29,21 @@ class Point():
         y = cy - height//2
         self.rect = QRect(x, y, width, height)
 
-    def set_point(self, pt_name = None,x= None,y=None, width = None, error = None,info = None):
+    def set_point(self, pt_name = None,x= None,y=None, width = None, error = None,info = None, absence = None):
         if pt_name is not None:
             self.pt_name = pt_name
         if x is not None:
             self.x = x
+        if absence is not None:
+            self.absence = absence
         if y is not None:
             self.y = y
-
         if error is not None:
             self.error = error
-        if info is not None:
-            self.info = info
 
+        self.info = info
         if width is None:
             width = self.rect.width()
-
-
 
         self.set_rect(self.x,self.y, width, width)
 
@@ -54,19 +52,23 @@ class Point():
         new_y = self.y * factor
         new_width = self.rect.width() *factor
 
-        return Point(self.pt_name, x=new_x, y=new_y, width=new_width, error=self.error, info=self.info)
+        return Point(self.pt_name, x=new_x, y=new_y, width=new_width, error=self.error, info=self.info, absence=self.absence)
 
 
+    def get_point_props_in_dict(self):
+        point = {'pt_name':self.pt_name,'x':self.x,'y':self.y,'absence':self.absence,'error':self.error}
+        return point
 
 class Image():
     current_pt_id = None
+    points = []
     def __init__(self, img_name, pt_lists=None):
         self.img_name = img_name
 
         if pt_lists:
             self.points = []
             for pt in pt_lists:
-                point = Point(pt['name'], pt['x'] , pt['y'])
+                point = Point(pt['name'], pt['x'] , pt['y'], absence=pt.get("absence", False))
                 self.points.append(point)
 
             self.current_pt_id = 0
@@ -129,16 +131,19 @@ class Image():
 
     def get_current_pt_y(self):
         return self.points[self.current_pt_id].y
+    def get_curent_pt_props(self):
+        return self.points[self.current_pt_id].get_point_props_in_dict()
 
 
 
 rect_length_prop = 0.015
+min_rect_length = 20
 class Data():
-
     def __init__(self, file_name, work_dir="."):
 
         self.work_dir = work_dir
         self.file_name = file_name
+        self.changed = False
 
         self.init_images()
 
@@ -157,9 +162,9 @@ class Data():
 
         self.current_image_id = 0
         self.img_size = len(self.images)
-
-        self.current_pixmap = QPixmap(os.path.join(self.work_dir,self.get_current_image_name()))
-        self.set_scale_fit_limit()
+        if self.img_size !=0:
+            self.current_pixmap = QPixmap(os.path.join(self.work_dir,self.get_current_image_name()))
+            self.set_scale_fit_limit()
         # Read and set the scale if it is too large
 
 
@@ -196,30 +201,50 @@ class Data():
         self.scale = self.origin_scale
 
     def set_scale_fit_limit(self):
-        if self.current_pixmap.width()>pixmap_size_limit.width() or self.current_pixmap.height()>pixmap_size_limit.height():
-            width_scale = ceil(self.current_pixmap.width()/pixmap_size_limit.width())
-            height_scale = ceil(self.current_pixmap.height()/pixmap_size_limit.height())
+        if self.current_pixmap.width()>pixmap_max_size_limit.width() or self.current_pixmap.height()>pixmap_max_size_limit.height():
+            width_scale = ceil(self.current_pixmap.width()/pixmap_max_size_limit.width())
+            height_scale = ceil(self.current_pixmap.height()/pixmap_max_size_limit.height())
 
-            self.set_scale(1/max(width_scale,height_scale))
+            self.origin_scale = 1/max(width_scale,height_scale)
+        elif self.current_pixmap.width()<pixmap_min_size_limit.width() or self.current_pixmap.height()<pixmap_min_size_limit.height():
+            width_scale = ceil(pixmap_min_size_limit.width()/self.current_pixmap.width())
+            height_scale = ceil(pixmap_min_size_limit.height()/self.current_pixmap.height())
+
+            self.origin_scale = max(width_scale,height_scale)
         else:
-            self.scale = 1
-        self.origin_scale = self.scale
-
+            self.origin_scale = 1
+        self.scale = self.origin_scale
         size = self.current_pixmap.size()
           # length = max(self.size().width() , self.size().height())
             # proportion =0.05
         length = int(rect_length_prop * max(size.width(),size.height()))
-        print(length)
+
+        if length<min_rect_length:
+            length = min_rect_length
         self.get_current_image().set_points_width(length)
 
+    def set_current_pt_of_current_img(self, pt_name = None,x= None,y=None, error = None,info = None, scaled_coords= False):
+        if scaled_coords:
+            if y is not None:
+                y = int(y/self.scale)
+            if x is not None:
+                x = int(x/self.scale)
 
+        self.get_current_image().get_current_pt().set_point(pt_name = pt_name, x= x, y=y, error = error,info = info)
 
+        self.changed = True
 
     def get_current_image(self):
-        return self.images[self.current_image_id]
+        if self.images:
+            return self.images[self.current_image_id]
+        else:
+            return None
 
     def get_current_image_points(self):
-        return self.images[self.current_image_id].points
+        if self.images:
+            return self.images[self.current_image_id].points
+        else:
+            return None
 
     def get_current_image_name(self):
         return self.images[self.current_image_id].img_name
@@ -235,8 +260,26 @@ class Data():
     def get_current_scaled_pixmap(self):
         return self.current_pixmap.scaled(self.scale *  self.current_pixmap.size() , Qt.KeepAspectRatio)
 
+    def get_current_origin_pixmap(self):
+        return self.current_pixmap
+
     def get_current_scaled_points(self):
-        return [pt * self.scale for pt in self.get_current_image_points()]
+        if self.images:
+            return [pt * self.scale for pt in self.get_current_image_points()]
+        else:
+            return None
+
+    def has_images(self):
+        if self.images:
+            return True
+        else:
+            return False
+
+    def has_points_current_image(self):
+        if self.images and self.images[self.current_image_id].points:
+            return True
+        else:
+            return False
 
     def write_json(self, save_name = None):
         # Create data form to save
@@ -256,3 +299,4 @@ class Data():
         with open(save_name, 'w') as write:
             json.dump(image_list, write)
 
+        self.changed = False

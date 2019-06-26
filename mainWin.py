@@ -1,16 +1,6 @@
 #!/usr/bin/python3
 # -*- coding: utf-8 -*-
 
-"""
-ZetCode PyQt5 tutorial
-
-This example shows
-how to use QSplitter widget.
-
-Author: Jan Bodnar
-Website: zetcode.com
-Last edited: August 2017
-"""
 
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
@@ -56,8 +46,8 @@ class MainWindow(QMainWindow):
         self.initUI()
 
     def init_load_files_test(self):
-        self.file_name = 'data/data_file.json'
-        self.work_dir = './data/'
+        self.file_name = 'genus.json'
+        self.work_dir = '../plumage/data/vis/'
 
         self.data = Data(self.file_name,self.work_dir)
 
@@ -85,12 +75,8 @@ class MainWindow(QMainWindow):
         self.statusBar().showMessage(PROGRAM_NAME)
         self.statusBar().show()
 
-        self.init_action()
-        self.init_menu()
-
-
         self.file_dock = QDockWidget('Files', self)
-        self.property_dock = QDockWidget('Properties', self)
+        self.property_dock = QDockWidget('Annotations', self)
         self.addDockWidget(Qt.RightDockWidgetArea, self.property_dock)
         self.addDockWidget(Qt.LeftDockWidgetArea, self.file_dock)
 
@@ -101,30 +87,45 @@ class MainWindow(QMainWindow):
         self.widget_file_list.currentItemChanged.connect(self.file_list_current_item_changed)
         self.widget_folder_label = QLabel(" Working Dir\n")
 
+        self.widget_anno_file_label = QLabel("Annotation\n")
+
         layout_file_dock = QVBoxLayout()
         layout_file_dock.setContentsMargins(0, 0.1, 0, 0.1)
+        layout_file_dock.addWidget((self.widget_anno_file_label))
         layout_file_dock.addWidget(self.widget_folder_label)
         layout_file_dock.addWidget(self.widget_file_list)
         widget_file_dock = QWidget()
         widget_file_dock.setLayout(layout_file_dock)
         self.file_dock.setWidget(widget_file_dock)
 
-        # Properties part
+        # Annotation part, tabs
+
+        self.widget_anno_tabs = QTabWidget()
+
+
+
+
         self.widget_point_list = QListWidget()
         self.widget_point_list.currentItemChanged.connect(self.point_list_current_item_changed)
 
-        self.widget_props_table = QTableWidget(len(prop_names),1)
+        self.widget_contour_list = QListWidget()
+
+        self.widget_anno_tabs.addTab(self.widget_point_list, "points")
+        self.widget_anno_tabs.addTab(self.widget_contour_list, "outlines")
+
+        #properties part
+        self.widget_props_table = QTableWidget(0,1)
         self.widget_props_table.itemChanged.connect(self.prop_table_item_changed)
-        self.widget_props_table.itemDoubleClicked.connect(self.prop_table_db_click)
+        # self.widget_props_table.itemDoubleClicked.connect(self.prop_table_db_click)
         # self.widget_props_table.currentItemChanged.connect(self.item_changed)
 
         self.widget_props_table.horizontalHeader().setVisible(False)
-        self.widget_props_table.setVerticalHeaderLabels(prop_names)
+        # self.widget_props_table.setVerticalHeaderLabels(prop_names)
 
         layout_prop_dock = QVBoxLayout()
 
         # layout_prop_dock.setContentsMargins(0, 0.1, 0, 0.1)
-        layout_prop_dock.addWidget(self.widget_point_list)
+        layout_prop_dock.addWidget(self.widget_anno_tabs)
         layout_prop_dock.addWidget(self.widget_props_table)
 
         widget_prop_dock = QWidget()
@@ -151,6 +152,8 @@ class MainWindow(QMainWindow):
         # self.scroll_area.setWidgetResizable(True)
         # self.scroll_area.setVisible(False)
 
+        self.init_action()
+        self.init_menu()
 
         self.setCentralWidget(self.scroll_area)
         self.setGeometry(100, 100, 1200, 800)
@@ -167,8 +170,9 @@ class MainWindow(QMainWindow):
         self.act_save = QAction("&Save", self , shortcut="Ctrl+S", triggered=self.save_annotations)
         self.act_save_as = QAction("Save as", self, triggered=self.save_as)
 
-        # self.act_open = QAction("Open &label file", self, triggered=self.open)
+
         self.act_exit = QAction("E&xit", self, shortcut="Ctrl+Q", triggered=self.close)
+
         # self.zoomInAct = QAction("Zoom &In (25%)", self, shortcut="Ctrl++", enabled=False, triggered=self.zoomIn)
         # self.zoomOutAct = QAction("Zoom &Out (25%)", self, shortcut="Ctrl+-", enabled=False, triggered=self.zoomOut)
         # self.normalSizeAct = QAction("&Normal Size", self, shortcut="Ctrl+S", enabled=False, triggered=self.normalSize)
@@ -180,17 +184,29 @@ class MainWindow(QMainWindow):
         # self.draw_act = QAction("&draw rect", self, enabled=True, triggered=self.draw_rect)
 
     def init_menu(self):
-        self.fileMenu = QMenu("&File", self)
-        self.fileMenu.addAction(self.act_open_annotations)
-        self.fileMenu.addAction(self.act_opendir)
-        self.fileMenu.addSeparator()
-        self.fileMenu.addAction(self.act_save)
-        self.fileMenu.addAction(self.act_save_as)
-        self.fileMenu.addSeparator()
-        self.fileMenu.addAction(self.act_exit)
+        # File part
+        self.menu_file = QMenu("&File", self)
+        self.menu_file.addAction(self.act_open_annotations)
+        self.menu_file.addAction(self.act_opendir)
+        self.menu_file.addSeparator()
+        self.menu_file.addAction(self.act_save)
+        self.menu_file.addAction(self.act_save_as)
+        self.menu_file.addSeparator()
+        self.menu_file.addAction(self.act_exit)
 
-        self.menuBar().addMenu(self.fileMenu)
+        self.menuBar().addMenu(self.menu_file)
 
+        #Edit part
+        self.menu_edit = QMenu("&Edit", self)
+
+        self.menuBar().addMenu(self.menu_edit)
+        #View part:
+        self.menu_view = QMenu("&View", self)
+        self.menu_view.addAction(self.widget_annotation.act_zoom_in)
+        self.menu_view.addAction(self.widget_annotation.act_zoom_out)
+        self.menu_view.addAction(self.widget_annotation.act_origin_size)
+
+        self.menuBar().addMenu(self.menu_view)
 
     def opendir(self, _value=False, dirpath=None):
 
@@ -218,6 +234,7 @@ class MainWindow(QMainWindow):
             file_name = os.path.abspath(file_name)
             self.data.set_file_name(file_name)
 
+
         self.list_file_names()
 
     def save_annotations(self):
@@ -236,120 +253,85 @@ class MainWindow(QMainWindow):
         copyfile(self.data.file_name,temp_path)
 
         # Save the new data into the same name
-        self.data.write_json("test_file_for_save.json")
+        self.data.write_json()
+        self.widget_anno_file_label.setText("Annotation file: {}".format(self.data.file_name))
 
     def save_as(self):
 
         current_dir = self.data.work_dir
         save_path, _ = QFileDialog.getSaveFileName(self, 'Saving Annotations',current_dir,"JSON (*.json)")
         self.data.write_json(save_path)
-
+        self.widget_anno_file_label.setText("Annotation file: {}".format(self.data.file_name))
 
     def list_file_names(self):
         if self.data:
             self.widget_file_list.clear()
-            img_list = self.data.images
-            work_dir = self.data.work_dir
-            for img in img_list:
-                self.widget_file_list.addItem(img.img_name)
 
+            if self.data.has_images():
+                for img in self.data.images:
+                    self.widget_file_list.addItem(img.img_name)
 
-        self.widget_folder_label.setText(" {}".format(work_dir))
-
-
-        # if self.data and self.all_file_list:
-        #     self.widget_file_list.clear()
-        #     print("listing data")
-        #     for entry in self.data:
-        #         if(entry[name_col] in self.all_file_list):
-        #             self.widget_file_list.addItem(entry[name_col])
-
-
-        # if not self.mayContinue() or not dirpath:
-        #     return
-        #
-        # self.lastOpenDir = dirpath
-        # self.dirname = dirpath
-        # self.filePath = None
-        # self.fileListWidget.clear()
-        # self.mImgList = self.scanAllImages(dirpath)
-        # self.openNextImg()
-        # for imgPath in self.mImgList:
-        #     item = QListWidgetItem(imgPath)
-        #     self.fileListWidget.addItem(item)
-
-    # def update_current_and_data(self ,name, x,y):
-    #     """
-    #     Update the data and current data
-    #     :param name:
-    #     :param x:
-    #     :param y:
-    #     :return:
-    #     """
-    #     entry = self.data[self.currect_data_id]
-    #
-    #     for pt in (entry[point_col]):
-    #         if pt['name'] == self.current_pt_name:
-    #             pt['name'] = name
-    #             pt['x'] = x
-    #             pt['y'] = y
-    #
-    #     self.current_pt_name = name
-    #     self.current_x =x
-    #     self.current_y =y
-    #
-    #
-    #     print(self.data)
+        work_dir = self.data.work_dir
+        self.widget_folder_label.setText("Working Dir: {}".format(os.path.abspath(work_dir)))
+        self.widget_anno_file_label.setText("Annotation file: {}".format(os.path.basename(self.data.file_name)))
 
 
 
     def list_properties(self):
 
         current_img = self.data.get_current_image()
-        pt_name  = create_table_item(current_img.get_current_pt_name())
-        x = create_table_item(current_img.get_current_pt_x())
-        y = create_table_item(current_img.get_current_pt_y())
+        # Create props table
+        if self.data.has_images():
+            pt_props = self.data.get_current_image().get_curent_pt_props()
+            self.widget_props_table.setRowCount(len(pt_props.keys()))
+            self.widget_props_table.setVerticalHeaderLabels(pt_props.keys())
+            for idx,prop in enumerate(pt_props):
+                value = create_table_item(pt_props[prop])
+                self.widget_props_table.setItem(idx,0, value)
+        else:
+            self.widget_props_table.setRowCount(0)
+            self.widget_props_table.clear()
 
+        # if current_img:
+        #     pt_name  = create_table_item(current_img.get_current_pt_name())
+        #     x = create_table_item(current_img.get_current_pt_x())
+        #     y = create_table_item(current_img.get_current_pt_y())
+        #
+        #
+        #     self.widget_props_table.setItem(0,0, pt_name)
+        #     self.widget_props_table.setItem(1,0, x)
+        #     self.widget_props_table.setItem(2,0, y)
+        #
+        # else:
+        #     self.widget_props_table.clear()
 
-        self.widget_props_table.setItem(0,0, pt_name)
-        self.widget_props_table.setItem(1,0, x)
-        self.widget_props_table.setItem(2,0, y)
 
 
     def list_point_name(self):
         self.widget_point_list.clear()
+
         points = self.data.get_current_image_points()
-        for pt in points:
-            self.widget_point_list.addItem(pt.pt_name)
-
-    def prop_table_db_click(self,item):
-        print(item.text())
-        x = int(self.widget_props_table.item(1,0).text())
-        y = int(self.widget_props_table.item(2,0).text())
-
-        self.data.get_current_image().set_current_pt(x=x, y=y)
-        self.widget_annotation.update()
-
-
+        if points:
+            for pt in points:
+                self.widget_point_list.addItem(pt.pt_name)
 
     def prop_table_item_changed(self, item):
-        # Update data if any item is changed
+        # Update data if any item in the property table changed
 
         if item is not None:
-            # Limit the
+            print("asd")
+            # Depending on different row of input.
             value = item.text()
             if self.widget_props_table.row(item) ==1:
                 value=int(value)
-                self.data.get_current_image().set_current_pt(x=value)
+                self.data.set_current_pt_of_current_img(x = value)
             if self.widget_props_table.row(item) ==2:
                 value=int(value)
-                self.data.get_current_image().set_current_pt(y=value)
+                self.data.set_current_pt_of_current_img(y=value)
 
+            if self.data.changed:
+                self.widget_anno_file_label.setText("Annotation file: {}*".format(self.data.file_name))
             self.widget_annotation.update()
-
-    def item_changed(self, cur, prev):
-        if prev is not None:
-            print("changed: ",cur.text() , prev.text())
 
     def file_list_current_item_changed(self,current,prev):
 
@@ -367,9 +349,9 @@ class MainWindow(QMainWindow):
             # # Open annotations and Clean the state
             # self.widget_annotation.set_annotations(self.data.get_current_image_points())
 
-            # # Set table:
-            self.list_properties()
-            self.list_point_name()
+        # # Set table:
+        self.list_properties()
+        self.list_point_name()
 
 
         # # Highlight the first row in the begining
