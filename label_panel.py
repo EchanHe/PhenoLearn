@@ -6,8 +6,8 @@ from PyQt5.QtWidgets import *
 from PyQt5.QtGui import *
 from PyQt5.QtCore import *
 import sys,os
-
-import mainWin
+import numpy as np
+import relabelData
 
 class LabelPanel(QWidget):
 
@@ -20,7 +20,8 @@ class LabelPanel(QWidget):
     def initUI(self, data ):
 
         self.state_moving = False
-        self.state_highlight = False
+
+        self.state_place_pt = False
 
         if data is not None:
             self.data = data
@@ -40,10 +41,12 @@ class LabelPanel(QWidget):
         self.scale = 1
         self.offset = QPointF(0, 0)
 
+
+
         self.setMouseTracking(True)
         self.setGeometry(300, 300, 800, 600)
-        self.setWindowTitle('Pen styles')
-        self.show()
+        self.setWindowTitle('label panel')
+        # self.show()
 
     def init_for_testing(self):
         # Used for testing the widget itself.
@@ -51,7 +54,9 @@ class LabelPanel(QWidget):
         file_name = 'data/data_file.json'
         work_dir = './data/'
 
-        self.data = mainWin.Data(file_name,work_dir)
+        self.data = relabelData.Data(file_name,work_dir)
+
+        # self.state_browse = True
 
         self.update()
 
@@ -62,17 +67,33 @@ class LabelPanel(QWidget):
         pos =e.pos()
 
         if e.button() == Qt.LeftButton:
+            mouse_in_pt = False
             # if it is on the a currrent point
             if self.data.get_current_scaled_points():
                 self.data.get_current_image().set_current_highlight_id(None)
-
                 for idx, pt, in enumerate(self.data.get_current_scaled_points()):
                     if not pt.absence:
                         if pt.rect.contains(pos):
                             self.open_state_moving()
-                            self.state_highlight = True
                             self.data.get_current_image().set_current_pt_id(idx)
                             self.data.get_current_image().set_current_highlight_id(idx)
+                            self.cache_pos = pos/self.data.scale
+
+                            mouse_in_pt = True
+
+            # Input point name
+            if self.state_place_pt and mouse_in_pt is False:
+                name = self.get_pt_name()
+                if name is not False:
+                    if name is None or name =='':
+                        QMessageBox.about(self, "Failed", "Fail to add the label\nname is empty.")
+                    elif not self.data.add_pt_for_current_img(name, pos.x(), pos.y()):
+                        QMessageBox.about(self, "Failed", "Fail to add the label\nname is duplicate.")
+                    else:
+                    # Add point successful and add points
+                        if self.parent():
+                            parent = self.parent().window()
+                            parent.list_point_name()
 
         self.update_in_parent(pos, True)
         self.update()
@@ -82,6 +103,9 @@ class LabelPanel(QWidget):
         pos = e.pos() #self.coords_tranform_widget_to_image(e.pos())
         if e.button() == Qt.LeftButton:
             # if it is on the a currrent point
+            if self.state_moving:
+                # Set the cache for the last position of points
+                self.data.get_current_pt_of_current_img().set_current_cache(x = self.cache_pos.x(), y = self.cache_pos.y())
             self.close_state_moving()
         self.update_in_parent(pos)
         self.update()
@@ -95,11 +119,13 @@ class LabelPanel(QWidget):
             y = max(min(self.pixmap.rect().height(), pos.y()), 0)
 
             #update the position.
-            self.data.set_current_pt_of_current_img(x = x, y= y, scaled_coords = True)
+            self.data.set_current_pt_of_current_img(x = x, y= y, scaled_coords = True , save_cache= False)
 
 
         self.update_in_parent(pos,self.state_moving)
         self.update()
+
+
 
     def update_in_parent(self, pos = None, moved = False):
         if self.parent():
@@ -107,6 +133,7 @@ class LabelPanel(QWidget):
 
             scale = self.data.scale
             parent.statusBar().showMessage("{}%".format(round(self.data.scale,2)*100))
+
 
             if pos is not None:
                 pixel_value = parent.data.get_current_scaled_pixmap().toImage().pixel(pos.x(),pos.y())
@@ -116,8 +143,7 @@ class LabelPanel(QWidget):
 
             if moved:
                 parent.list_properties()
-            if parent.data.changed:
-                parent.widget_anno_file_label.setText("Annotation file: {}*".format(parent.data.file_name))
+
 
 
     def paintEvent(self, e):
@@ -125,7 +151,7 @@ class LabelPanel(QWidget):
         painter = QPainter(self)
 
         # Draw image part
-        if self.data is not None and self.data.has_images():
+        if self.data.has_images():
             self.draw_image(painter)
 
             # Draw annotations:
@@ -142,7 +168,6 @@ class LabelPanel(QWidget):
                         bbox = pt.rect
                         self.draw_point(painter ,bbox)
 
-
                 #Setting for drawings Highlight:
                 pen = QPen(Qt.red, 4)
                 brush = QBrush(QColor(0, 255, 255, 200))
@@ -154,9 +179,6 @@ class LabelPanel(QWidget):
                     painter.drawRect(highlight_bbox)
         else:
             painter.eraseRect(self.rect())
-
-
-
     def draw_image(self,painter):
 
         self.pixmap = self.data.get_current_scaled_pixmap()
@@ -206,6 +228,22 @@ class LabelPanel(QWidget):
 
     def close_state_moving(self):
         self.state_moving = False
+
+
+
+    def get_pt_name(self):
+
+        # List of name choices with[None, all known names of this dataset.]
+        items = [None]+sorted(self.data.pt_names)
+
+        item, ok = QInputDialog.getItem(self, 'Enter the name for this label',
+         "Name:", items, current = 0, editable  = True)
+
+        if ok:
+            return item
+        else:
+            return False
+
 
     ### Deprecated funs ###
 
