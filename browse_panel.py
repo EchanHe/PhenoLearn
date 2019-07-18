@@ -104,6 +104,10 @@ class BrowsePanel(QWidget):
                 # From the scale point , draw points
         scale = max(self.orignal_size.width()/thumbnail_size.width(), self.orignal_size.height()/thumbnail_size.height())
 
+        thumbnail_scale = int(self.data.current_pixmap.width() / self.orignal_size.width())
+
+        print(thumbnail_scale)
+
         # self.painter.scale(1/scale,1/scale)
 
         # self.painter.scale(1/scale,1/scale)
@@ -118,7 +122,7 @@ class BrowsePanel(QWidget):
             for pt in self.points:
                 if not pt.absence:
                     bbox = pt.rect
-                    self.painter.drawEllipse(bbox.center()/(20*scale), point_size.width(), point_size.height())
+                    self.painter.drawEllipse(bbox.center()/(thumbnail_scale*scale), point_size.width(), point_size.height())
                     # self.painter.drawEllipse(100,100, bbox.width()//2, bbox.height()//2)
 
 
@@ -164,14 +168,16 @@ class BrowsePanel(QWidget):
                 # read images and draw annotation
 
                 self.pixmap = QPixmap(os.path.join(self.thumbnail_dir, image.img_name))
-                # self.pixmap = QPixmap("small.jpg")
-                self.orignal_size = self.pixmap.size()
-                self.pixmap = self.pixmap.scaled(thumbnail_size, aspectRatioMode=Qt.KeepAspectRatio)
-                self.painter = QPainter()
 
-                self.painter.begin(self.pixmap)
-                self.draw_points()
-                self.painter.end()
+                if not self.pixmap.isNull():
+                    # self.pixmap = QPixmap("small.jpg")
+                    self.orignal_size = self.pixmap.size()
+                    self.pixmap = self.pixmap.scaled(thumbnail_size, aspectRatioMode=Qt.KeepAspectRatio)
+                    self.painter = QPainter()
+
+                    self.painter.begin(self.pixmap)
+                    self.draw_points()
+                    self.painter.end()
 
                 icon = QIcon()
                 icon.addPixmap(self.pixmap, QIcon.Normal, QIcon.Off)

@@ -9,13 +9,10 @@ import sys
 import label_panel
 import browse_panel
 import os
-from pathlib import Path
-import json
-import glob
 import datetime
 from shutil import copyfile
 
-from relabelData import Data
+from relabelData import Data,Data_gui
 
 PROGRAM_NAME = 'Relabelling'
 
@@ -38,15 +35,17 @@ class MainWindow(QMainWindow):
     def init_load_files_test(self):
         self.file_name = 'genus.json'
         self.work_dir = '../plumage/data/vis/'
+        # self.work_dir = '.'
 
-        self.data = Data(self.file_name, self.work_dir)
-        # self.data = Data(None, self.work_dir)
-        self.list_file_names()
+        self.data = Data_gui(self.file_name, self.work_dir)
+        # self.data = Data_gui(None, self.work_dir)
+        # self.list_file_names()
 
 
     def initUI(self):
 
-        self.data = Data()
+        self.data = Data_gui()
+
 
         self.all_file_list = []
 
@@ -65,12 +64,11 @@ class MainWindow(QMainWindow):
         # File list part
         self.widget_file_list = QListWidget()
 
-
-        self.widget_file_list.currentItemChanged.connect(self.file_list_current_item_changed)
+        self.widget_file_list.currentRowChanged.connect(self.file_list_current_item_changed)
 
         self.widget_folder_label = QLabel(" Working Dir\n")
 
-        self.widget_anno_file_label = QLabel("Annotation\n")
+        self.widget_anno_file_label = QLabel("Annotation file: {}".format(self.data.file_name))
 
         layout_file_dock = QVBoxLayout()
         layout_file_dock.setContentsMargins(0, 0.1, 0, 0.1)
@@ -85,7 +83,7 @@ class MainWindow(QMainWindow):
         self.widget_anno_tabs = QTabWidget()
 
         self.widget_point_list = QListWidget()
-        self.widget_point_list.currentItemChanged.connect(self.point_list_current_item_changed)
+        self.widget_point_list.currentRowChanged.connect(self.point_list_current_item_changed)
 
         self.widget_contour_list = QListWidget()
 
@@ -114,6 +112,11 @@ class MainWindow(QMainWindow):
         self.statusBar().addPermanentWidget(self.label_xy_status)
 
         self.init_load_files_test()
+
+        self.data.signal_data_changed.connect(self.update_file_label)
+        self.data.signal_has_images.connect(self.update_menu_has_imgs)
+        self.data.signal_has_undo.connect(self.update_menu_undo)
+
 
         self.widget_annotation = label_panel.LabelPanel(self.data)
         self.widget_browser = browse_panel.BrowsePanel(self.data)
@@ -145,12 +148,13 @@ class MainWindow(QMainWindow):
         self.setWindowTitle(PROGRAM_NAME)
         self.show()
 
-
+        self.list_file_names()
 
 
     def init_action(self):
         self.act_opendir = QAction("&Open image dir", self, triggered=self.opendir)
         self.act_open_annotations = QAction("Open &label file", self, triggered=self.open_annotations)
+        self.act_set_thumbnail_dir = QAction("Set the folder of icons", self, triggered=self.open_thumbnail_dir)
 
         self.act_save = QAction("&Save", self , shortcut="Ctrl+S", triggered=self.save_annotations)
         self.act_save_as = QAction("Save as", self, triggered=self.save_as)
@@ -167,6 +171,8 @@ class MainWindow(QMainWindow):
         self.act_delete_point = QAction("Delete point", self, triggered=self.delete_point)
 
 
+        self.act_sort_file_names = QAction("sort file", self, triggered = self.sort_file_names , checkable=True, enabled = False)
+        self.act_sort_anno_names = QAction("sort annotations", self, triggered = self.sort_anno_names , checkable=True, enabled = False)
 
     def init_menu(self):
         # File part
@@ -201,10 +207,12 @@ class MainWindow(QMainWindow):
         self.menuBar().addMenu(self.menu_view)
 
         self.menu_tool = QMenu("&Tool", self)
+        self.menu_tool.addAction(self.act_sort_file_names)
+        self.menu_tool.addAction(self.act_sort_anno_names)
 
         self.menuBar().addMenu(self.menu_tool)
 
-        self.toolbar = self.addToolBar("as")
+        self.toolbar = self.addToolBar("Tool bars")
 
         self.toolbar.addAction(self.act_point_mode)
         self.toolbar.addSeparator()
@@ -229,6 +237,8 @@ class MainWindow(QMainWindow):
 
             self.widget_browser.reset_widget()
 
+        self.widget_folder_label.setText("Working Dir: {}".format(os.path.abspath(self.data.work_dir)))
+
     def open_annotations(self):
         self.message_unsave()
         options = QFileDialog.Options()
@@ -238,17 +248,24 @@ class MainWindow(QMainWindow):
         if file_name:
             file_name = os.path.abspath(file_name)
             self.data.set_file_name(file_name)
+            self.data.set_changed(False)
+
             self.widget_browser.reset_widget()
 
         self.list_file_names()
 
-        if self.data:
-            self.data.changed = False
+    def open_thumbnail_dir(self):
+        print("set thumbnail dir")
+
 
     def undo(self):
-        self.data.get_current_pt_of_current_img().undo_set_point()
+        # Undo action.
+        # self.data.get_current_pt_of_current_img().undo_set_point()
 
-        self.list_properties()
+        self.data.undo_act()
+
+        self.list_point_name()
+        # self.list_properties()
         self.widget_annotation.update()
     def save_annotations(self):
 
@@ -257,16 +274,17 @@ class MainWindow(QMainWindow):
         json_dir = os.path.dirname(self.data.file_name)
         time_now = datetime.datetime.now()
         temp_dir = os.path.join( os.path.join(json_dir,'temp'), time_now.strftime("%Y-%m-%d_%H-%M-%S"))
-        print(temp_dir)
-        if not os.path.exists(temp_dir):
-            os.makedirs(temp_dir)
-        temp_path = os.path.join(temp_dir,json_name)
 
-        copyfile(self.data.file_name,temp_path)
+        # Save a backup to temp dir
+        if not self.data.no_anno_file:
+            if not os.path.exists(temp_dir):
+                os.makedirs(temp_dir)
+            temp_path = os.path.join(temp_dir,json_name)
+            copyfile(self.data.file_name,temp_path)
 
         # Save the new data into the same name
         self.data.write_json()
-        self.widget_anno_file_label.setText("Annotation file: {}".format(self.data.file_name))
+        # self.widget_anno_file_label.setText("Annotation file: {}".format(self.data.file_name))
 
     def save_as(self):
 
@@ -274,7 +292,7 @@ class MainWindow(QMainWindow):
         save_path, _ = QFileDialog.getSaveFileName(self, 'Saving Annotations',current_dir,"JSON (*.json)")
         self.data.write_json(save_path)
         self.data.file_name = save_path
-        self.widget_anno_file_label.setText("Annotation file: {}".format(self.data.file_name))
+        # self.widget_anno_file_label.setText("Annotation file: {}".format(self.data.file_name))
 
     def list_file_names(self):
         if self.data:
@@ -284,9 +302,10 @@ class MainWindow(QMainWindow):
                 for img in self.data.images:
                     self.widget_file_list.addItem(img.img_name)
 
-        work_dir = self.data.work_dir
-        self.widget_folder_label.setText("Working Dir: {}".format(os.path.abspath(work_dir)))
-        self.widget_anno_file_label.setText("Annotation file: {}".format(os.path.basename(self.data.file_name)))
+        # Update everything, if the file lists changed.
+        self.widget_browser.reset_widget()
+
+        # self.widget_anno_file_label.setText("Annotation file: {}".format(os.path.basename(self.data.file_name)))
 
 
     def list_point_name(self):
@@ -332,29 +351,26 @@ class MainWindow(QMainWindow):
             pt_prop = {key: value}
             self.data.set_current_pt_of_current_img_dict(pt_prop)
 
-            # Update change file
-            if self.data.changed:
-                self.widget_anno_file_label.setText("Annotation file: {}*".format(self.data.file_name))
-            self.widget_annotation.update()
 
-    def file_list_current_item_changed(self,current,prev):
+    def file_list_current_item_changed(self,row):
 
-        if current:
-            idx = self.widget_file_list.currentRow()
+        if row !=-1:
+            idx = row
+
             self.widget_file_list.setCurrentRow(idx)
             self.data.set_image_id(idx)
             self.widget_annotation.update()
 
-        # # Set table:
-        self.list_properties()
-        self.list_point_name()
+            # # Set table:
+            self.list_properties()
+            self.list_point_name()
 
-    def point_list_current_item_changed(self,current,prev):
 
-        if current is not None:
-            idx_pt = self.widget_point_list.currentRow()
+    def point_list_current_item_changed(self,row):
+        if row !=-1:
+            idx_pt = row
+
             self.widget_point_list.setCurrentRow(idx_pt)
-
             self.data.get_current_image().set_current_pt_id(idx_pt)
             self.list_properties()
 
@@ -407,7 +423,6 @@ class MainWindow(QMainWindow):
     def toggle_flag_img(self):
         self.data.toggle_flag_img(self.act_attention_imgs_only.isChecked())
         self.list_file_names()
-        self.widget_browser.reset_widget()
         self.widget_annotation.update()
 
 
@@ -454,6 +469,54 @@ class MainWindow(QMainWindow):
             self.act_delete_point.setText("Delete {}".format(self.widget_point_list.currentItem().text()))
             menu.addAction(self.act_delete_point)
             menu.exec_(self.widget_point_list.viewport().mapToGlobal(position))
+
+    def update_file_label(self, changed):
+        """
+        update app when data changed
+        :param changed: Whether the value is change or not
+        :return:
+        """
+        if changed == True:
+            self.widget_anno_file_label.setText("Annotation file: {}*".format(self.data.file_name))
+            self.widget_annotation.update()
+        else:
+            self.widget_anno_file_label.setText("Annotation file: {}".format(self.data.file_name))
+
+    def update_menu_has_imgs(self):
+        # Enable acts after having images
+
+        self.act_sort_file_names.setEnabled(True)
+        self.act_sort_anno_names.setEnabled(True)
+
+        self.widget_annotation.act_origin_size.setEnabled(True)
+        self.widget_annotation.act_zoom_in.setEnabled(True)
+        self.widget_annotation.act_zoom_out.setEnabled(True)
+
+
+
+    def update_menu_undo(self, changed):
+        self.act_undo.setEnabled(changed)
+
+
+    def sort_file_names(self):
+        """
+        Sort file names alphabetically
+
+        :return:
+        """
+        self.data.sort(self.act_sort_file_names.isChecked())
+        self.list_file_names()
+        self.widget_file_list.setCurrentRow(0)
+
+    def sort_anno_names(self):
+        """
+        Sort the annotaion of name alphabetically
+        :return:
+        """
+        self.data.set_sort_points(self.act_sort_anno_names.isChecked())
+
+        self.list_point_name()
+
 
 if __name__ == '__main__':
 

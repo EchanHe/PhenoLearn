@@ -9,6 +9,10 @@ import sys,os
 import numpy as np
 import relabelData
 
+# class Communicate(QObject):
+
+
+
 class LabelPanel(QWidget):
 
     def __init__(self,  data = None):
@@ -26,12 +30,9 @@ class LabelPanel(QWidget):
         if data is not None:
             self.data = data
 
-        self.act_origin_size = QAction("Original Scale", self, shortcut="Ctrl+o",
-                                      triggered=self.origin)
-        self.act_zoom_in = QAction("Zoom &In", self, shortcut="Ctrl+R",
-                                      triggered=self.zoom_in)
-        self.act_zoom_out = QAction("Zoom &Out", self, shortcut="Ctrl+F",
-                                      triggered=self.zoom_out)
+        self.act_origin_size = QAction("Original Scale", self, shortcut="Ctrl+o", triggered=self.origin, enabled = False)
+        self.act_zoom_in = QAction("Zoom &In", self, shortcut="Ctrl+R", triggered=self.zoom_in, enabled = False)
+        self.act_zoom_out = QAction("Zoom &Out", self, shortcut="Ctrl+F", triggered=self.zoom_out, enabled = False)
 
         # self.addAction(act_zoom_in)
         # self.addAction(act_zoom_out)
@@ -67,6 +68,7 @@ class LabelPanel(QWidget):
         pos =e.pos()
 
         if e.button() == Qt.LeftButton:
+            print("click")
             mouse_in_pt = False
             # if it is on the a currrent point
             if self.data.get_current_scaled_points():
@@ -77,23 +79,15 @@ class LabelPanel(QWidget):
                             self.open_state_moving()
                             self.data.get_current_image().set_current_pt_id(idx)
                             self.data.get_current_image().set_current_highlight_id(idx)
-                            self.cache_pos = pos/self.data.scale
+
+                            self.data.cache_for_dragging(begin =True)
+
 
                             mouse_in_pt = True
 
             # Input point name
             if self.state_place_pt and mouse_in_pt is False:
-                name = self.get_pt_name()
-                if name is not False:
-                    if name is None or name =='':
-                        QMessageBox.about(self, "Failed", "Fail to add the label\nname is empty.")
-                    elif not self.data.add_pt_for_current_img(name, pos.x(), pos.y()):
-                        QMessageBox.about(self, "Failed", "Fail to add the label\nname is duplicate.")
-                    else:
-                    # Add point successful and add points
-                        if self.parent():
-                            parent = self.parent().window()
-                            parent.list_point_name()
+                self.add_pt(pos)
 
         self.update_in_parent(pos, True)
         self.update()
@@ -104,8 +98,8 @@ class LabelPanel(QWidget):
         if e.button() == Qt.LeftButton:
             # if it is on the a currrent point
             if self.state_moving:
-                # Set the cache for the last position of points
-                self.data.get_current_pt_of_current_img().set_current_cache(x = self.cache_pos.x(), y = self.cache_pos.y())
+                self.data.cache_for_dragging(begin =False)
+
             self.close_state_moving()
         self.update_in_parent(pos)
         self.update()
@@ -115,11 +109,12 @@ class LabelPanel(QWidget):
 
 
         if self.state_moving:
+            # Set the point with dragging on
             x = max(min(self.pixmap.rect().width(), pos.x()),0)
             y = max(min(self.pixmap.rect().height(), pos.y()), 0)
 
             #update the position.
-            self.data.set_current_pt_of_current_img(x = x, y= y, scaled_coords = True , save_cache= False)
+            self.data.set_current_pt_of_current_img(x = x, y= y, scaled_coords = True)
 
 
         self.update_in_parent(pos,self.state_moving)
@@ -220,14 +215,25 @@ class LabelPanel(QWidget):
         self.data.reset_scale()
         self.update()
 
-    def toggle_state_moving(self):
-        self.state_moving = not self.state_moving
 
     def open_state_moving(self):
         self.state_moving = True
 
     def close_state_moving(self):
         self.state_moving = False
+
+
+    def add_pt(self, pos):
+        name = self.get_pt_name()
+        if name is not False:
+            if name is None or name =='':
+                QMessageBox.about(self, "Failed", "Fail to add the label\nname is empty.")
+            elif not self.data.add_pt_for_current_img(name, pos.x(), pos.y()):
+                QMessageBox.about(self, "Failed", "Fail to add the label\nname is duplicate.")
+            elif self.parent():
+            # Add point successful and add points
+                parent = self.parent().window()
+                parent.list_point_name()
 
 
 

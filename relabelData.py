@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 import json
 from math import ceil
+import copy
 
 pixmap_max_size_limit = QSize(1300,700)
 pixmap_min_size_limit = QSize(400,200)
@@ -16,22 +17,17 @@ min_rect_length = 20
 
 class Point():
     def __init__(self, pt_name, x, y, width = 10, error = False,info = None, absence = False):
-        self.set_point(pt_name,x,y,width,error=error,info=info,absence=absence, save_cache=False)
+        self.set_point(pt_name,x,y,width,error=error,info=info,absence=absence)
 
-    def set_point(self, pt_name = None,x= None,y=None, width = None, error = None,info = None, absence = None, save_cache = True):
-        if (pt_name is not None or x is not None or y is not None or error is not None or absence is not None) and save_cache:
-            self.cache = self.get_point_props_dict()
-        else:
-            self.cache = None
-
+    def set_point(self, pt_name = None,x= None,y=None, width = None, error = None,info = None, absence = None):
         if pt_name is not None:
             self.pt_name = pt_name
         if x is not None:
-            self.x = x
+            self.x = int(x)
         if absence is not None:
             self.absence = absence
         if y is not None:
-            self.y = y
+            self.y = int(y)
         if error is not None:
             self.error = error
 
@@ -67,15 +63,17 @@ class Point():
 
         return Point(self.pt_name, x=new_x, y=new_y, width=new_width, error=self.error, info=self.info, absence=self.absence)
 
-    def undo_set_point(self):
-        if self.cache is not None:
-            self.set_point(self.cache['pt_name'], self.cache['x'], self.cache['y'],
-                           error = self.cache['error'], absence = self.cache['absence'], save_cache = False)
+
 
     def get_point_props_dict(self):
         point = {'pt_name':self.pt_name,'x':self.x,'y':self.y,'absence':self.absence,'error':self.error}
         return point
 
+    # Deprecate
+    def undo_set_point(self):
+        if self.cache is not None:
+            self.set_point(self.cache['pt_name'], self.cache['x'], self.cache['y'],
+                           error = self.cache['error'], absence = self.cache['absence'], save_cache = False)
 
     def set_current_cache(self,x, y):
         self.cache = self.get_point_props_dict()
@@ -153,7 +151,7 @@ class Data():
         :param file_name: annotation file
         :param work_dir: working directory for images
         """
-        self.images = []
+        self.images= []
         self.pt_names = set()
 
         self.work_dir = work_dir
@@ -165,6 +163,11 @@ class Data():
             self.file_name = file_name
             self.no_anno_file = False
         self.changed = False
+        # Sorting part
+        self.sort_points = False
+        self.images_origin = None
+        self.points_origin = None
+
         self.init_images()
 
 
@@ -201,12 +204,33 @@ class Data():
                 self.set_scale_fit_limit()
 
 
+    def sort(self, value):
+        if value == True:
+            self.images_origin = self.images.copy()
+            self.images.sort(key = lambda x:x.img_name, reverse = False)
+        elif self.images_origin is not None:
+            self.images = self.images_origin
+    def set_sort_points(self, value):
+        self.sort_points = value
+
+        self.sorting_points()
+
+    def sorting_points(self):
+
+        if self.sort_points:
+            self.points_origin = self.get_current_image().points.copy()
+            self.get_current_image().points.sort(key = lambda x:x.pt_name)
+        elif self.points_origin is not None:
+            self.get_current_image().points = self.points_origin
+            self.points_origin = None
+
     def set_image_id(self, idx):
         self.current_image_id = idx
         # Reset scale and current pixmap
 
         self.current_pixmap = QPixmap(os.path.join(self.work_dir,self.get_current_image_name()))
         self.set_scale_fit_limit()
+        self.sorting_points()
 
     def set_work_dir(self,work_dir):
         self.work_dir = work_dir
@@ -245,23 +269,27 @@ class Data():
         size = self.current_pixmap.size()
 
         # The width length
-        length = int(rect_length_prop * max(size.width(),size.height()))
+        self.length = int(rect_length_prop * max(size.width(),size.height()))
 
-        if length<min_rect_length:
-            length = min_rect_length
-        self.get_current_image().set_points_width(length)
+        if self.length<min_rect_length:
+            self.length = min_rect_length
+        self.get_current_image().set_points_width(self.length)
 
-    def set_current_pt_of_current_img(self, pt_name = None,x= None,y=None, error = None, absence = None,info = None, scaled_coords= False , save_cache = True):
+    def set_current_pt_of_current_img(self, pt_name = None,x= None,y=None, error = None, absence = None,info = None, scaled_coords= False):
         if scaled_coords:
             if y is not None:
                 y = int(y/self.scale)
             if x is not None:
                 x = int(x/self.scale)
 
+
         if self.get_current_pt_of_current_img().check_diff(pt_name = pt_name, x= x, y=y, error = error , absence = absence,info = info):
-            self.get_current_image().get_current_pt().set_point(pt_name = pt_name, x= x, y=y, error = error, absence = absence,info = info, save_cache = save_cache)
+            self.get_current_image().get_current_pt().set_point(pt_name = pt_name, x= x, y=y, error = error, absence = absence,info = info)
 
             self.changed = True
+            return True
+        else:
+            return False
 
     def set_current_pt_of_current_img_dict(self, pt_prop):
 
@@ -285,32 +313,32 @@ class Data():
             self.get_current_image().current_pt_id=0
         if pt_name not in pt_names:
             # if the point name is not duplicate add
-            size = self.current_pixmap.size()
-            length = int(rect_length_prop * max(size.width(),size.height()))
-
             if scaled_coords:
                 y = int(y/self.scale)
                 x = int(x/self.scale)
 
-            temp = Point(pt_name, x, y, width = length, absence=False)
+            temp = Point(pt_name, x, y, width = self.length, absence=False)
             self.get_current_image().points.append(temp)
 
             self.pt_names.add(pt_name)
-            return True
+            self.changed = True
 
+            return True
         else:
             return False
 
     def remove_pt_for_current_img(self, idx = None):
         if idx is not None:
-            self.get_current_image().points.pop(idx)
+            pt = self.get_current_image().points.pop(idx)
+
         else:
             idx = self.get_current_image().current_pt_id
-            self.get_current_image().points.pop(idx)
+            pt = self.get_current_image().points.pop(idx)
 
         if self.get_current_image().current_pt_id >= len(self.get_current_image().points):
             self.get_current_image().current_pt_id = len(self.get_current_image().points)-1
 
+        return pt
     def get_current_pt_of_current_img(self):
         return self.images[self.current_image_id].get_current_pt()
 
@@ -334,8 +362,6 @@ class Data():
         path = os.path.abspath(path)
         return path
 
-    def get_image_id(self):
-        return self.current_image_id
 
     def get_current_scaled_pixmap(self):
         return self.current_pixmap.scaled(self.scale *  self.current_pixmap.size() , Qt.KeepAspectRatio)
@@ -390,4 +416,143 @@ class Data():
         self.changed = False
 
 
+class Data_gui(Data, QObject):
+    # Data changed signal
+    signal_data_changed = pyqtSignal(bool)
+    signal_has_images = pyqtSignal()
+    signal_has_undo = pyqtSignal(bool)
 
+    # push in edit, remove and add
+    undo_stack = []
+
+    def __init__(self,   file_name = None, work_dir=None):
+        Data.__init__(self,file_name,work_dir)
+        QObject.__init__(self)
+        # super().__init__()
+
+        if self.images:
+            self.signal_has_images.emit()
+
+
+    def set_work_dir(self,work_dir):
+        super().set_work_dir( work_dir)
+        if self.images:
+            self.signal_has_images.emit()
+
+    def remove_pt_for_current_img(self, idx = None):
+        pt = super().remove_pt_for_current_img(idx)
+
+        self.push_undo({"pt_remove":pt})
+
+    def add_pt_for_current_img(self, pt_name, x, y, scaled_coords= True):
+        # changed = Data.add_pt_for_current_img(self, pt_name, x, y, scaled_coords)
+        changed = super().add_pt_for_current_img( pt_name, x, y, scaled_coords)
+
+        self.value_change(changed)
+        if changed:
+            self.push_undo({"pt_add":pt_name})
+
+        return changed
+
+
+    def write_json(self, save_name = None):
+        super().write_json(save_name)
+
+        self.value_change(False)
+
+    def set_current_pt_of_current_img(self, pt_name = None,x= None,y=None, error = None, absence = None,info = None,
+                                      scaled_coords= False ):
+
+        changed = super().set_current_pt_of_current_img(pt_name, x,y,error,absence,info,scaled_coords)
+
+        self.value_change(changed)
+
+        # if not dragging and changed:
+        #     self.push_undo({"edit":prev_pt})
+
+    def cache_for_dragging(self, begin):
+
+        if begin:
+            self.prev_pt = copy.deepcopy(self.get_current_pt_of_current_img())
+            print(self.prev_pt.x)
+        else:
+            cur_pt = self.get_current_pt_of_current_img()
+            print(cur_pt.x , self.prev_pt.x)
+            if cur_pt.x!= self.prev_pt.x or cur_pt.y!= self.prev_pt.y:
+                self.push_undo({"pt_edit":self.prev_pt})
+
+    def undo_act(self):
+        """
+        React to undo different action from the poped item
+
+        :return:
+        """
+        act = self.pop_undo()
+        if act:
+            print(act)
+
+            key = list(act.keys())[0]
+            value = act[key]
+
+            if key == 'pt_add':
+                points = self.get_current_image().points
+                del_id = -1
+                for idx, pt in enumerate(points):
+                    if pt.pt_name == value:
+                        del_id = idx
+                        break
+
+                self.remove_pt_for_current_img(del_id)
+                self.pop_undo()
+
+            elif key == 'pt_edit':
+                # FInd the current point and then reset
+                points = self.get_current_image().points
+                del_id = -1
+                for idx, pt in enumerate(points):
+                    if pt.pt_name == value.pt_name:
+                        del_id = idx
+                        break
+                self.get_current_image().set_current_pt_id(del_id)
+                self.set_current_pt_of_current_img(x = value.x , y =value.y)
+
+
+            elif key == 'pt_remove':
+                self.get_current_image().points.append(value)
+
+            #After undo things, clean again.
+
+
+    def set_image_id(self, idx):
+        if idx != self.current_image_id:
+            self.undo_stack = []
+            self.signal_has_undo.emit(False)
+
+        super().set_image_id(idx)
+
+    def push_undo(self, item):
+        if len(self.undo_stack) == 0:
+            self.signal_has_undo.emit(True)
+        if len(self.undo_stack)<5:
+            self.undo_stack.append(item)
+
+
+
+    def pop_undo(self):
+        if not self.undo_stack:
+            self.signal_has_undo.emit(False)
+            return False
+        else:
+            act = self.undo_stack.pop()
+
+            if not self.undo_stack:
+                self.signal_has_undo.emit(False)
+
+            return act
+
+    def value_change(self, changed):
+        self.signal_data_changed.emit(changed)
+
+    def set_changed(self, value):
+        self.changed = value
+        self.value_change(value)
