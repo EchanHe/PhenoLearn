@@ -46,6 +46,11 @@ class BrowsePanel(QWidget):
         self.widget_image_browser.itemDoubleClicked.connect(self.go_to_annotation)
 
 
+        self.read_thread = ReadThumbnailThread([])
+        self.read_thread.read_one_image.connect(self.add_image)
+        self.painter = QPainter()
+
+
         self.layout.addWidget(self.widget_image_browser)
         self.setLayout(self.layout)
 
@@ -61,6 +66,9 @@ class BrowsePanel(QWidget):
         # self.show()
 
         self.setMouseTracking(True)
+
+
+        self.is_icon_hide = False
 
     def init_for_testing(self):
         # Used for testing the widget itself.
@@ -100,13 +108,23 @@ class BrowsePanel(QWidget):
     def reset_widget(self):
         self.init_list()
 
+    def hide_icons(self, hide, flagged_img_idx):
+        self.is_icon_hide = hide
+        if hide:
+            self.flagged_img_idx = flagged_img_idx
+            for row in range(self.widget_image_browser.count()):
+                if row not in flagged_img_idx:
+                    self.widget_image_browser.item(row).setHidden(True)
+        else:
+            for row in range(self.widget_image_browser.count()):
+                self.widget_image_browser.item(row).setHidden(False)
+
+
     def draw_points(self):
                 # From the scale point , draw points
         scale = max(self.orignal_size.width()/thumbnail_size.width(), self.orignal_size.height()/thumbnail_size.height())
 
         thumbnail_scale = int(self.data.current_pixmap.width() / self.orignal_size.width())
-
-        print(thumbnail_scale)
 
         # self.painter.scale(1/scale,1/scale)
 
@@ -118,13 +136,26 @@ class BrowsePanel(QWidget):
         self.painter.setBrush(brush)
 
 
-        if self.points:
-            for pt in self.points:
+        if self.points_dict:
+            for key, pt in self.points_dict.items():
                 if not pt.absence:
                     bbox = pt.rect
                     self.painter.drawEllipse(bbox.center()/(thumbnail_scale*scale), point_size.width(), point_size.height())
                     # self.painter.drawEllipse(100,100, bbox.width()//2, bbox.height()//2)
 
+    def draw_points_args(self ,points_dict):
+        scale = max(self.data.current_pixmap.width()/thumbnail_size.width(), self.data.current_pixmap.height()/thumbnail_size.height())
+
+        pen = QPen(Qt.red, 2)
+        brush = QBrush(QColor(0, 255, 255, 120))
+        self.painter.setPen(pen)
+        self.painter.setBrush(brush)
+
+        if points_dict:
+            for key, pt in points_dict.items():
+                if not pt.absence:
+                    bbox = pt.rect
+                    self.painter.drawEllipse(bbox.center()/(scale), point_size.width(), point_size.height())
 
 
 
@@ -160,35 +191,61 @@ class BrowsePanel(QWidget):
             start_img = prev_imgs -(images_per_row*images_per_col)
             start_img_id = max(0,start_img)
             end_img_id = min(image_count , start_img_id+images_per_row*(images_per_col+2))
-            for img_id in range(start_img_id, end_img_id):
 
-                image = self.data.images[img_id]
-                self.points = image.points
+            if self.is_icon_hide:
+                img_list = [self.data.images[img_id] for img_id in self.flagged_img_idx[start_img_id:end_img_id]]
+                img_id_list = [img_id for img_id in self.flagged_img_idx[start_img_id:end_img_id]]
+            else:
+                img_list = [self.data.images[img_id] for img_id in range(start_img_id, end_img_id)]
+                img_id_list = [img_id for img_id in range(start_img_id, end_img_id)]
 
-                # read images and draw annotation
+            print("Update the ids:" , img_id_list)
+            self.read_thread.terminate()
 
-                self.pixmap = QPixmap(os.path.join(self.thumbnail_dir, image.img_name))
-
-                if not self.pixmap.isNull():
-                    # self.pixmap = QPixmap("small.jpg")
-                    self.orignal_size = self.pixmap.size()
-                    self.pixmap = self.pixmap.scaled(thumbnail_size, aspectRatioMode=Qt.KeepAspectRatio)
-                    self.painter = QPainter()
-
-                    self.painter.begin(self.pixmap)
-                    self.draw_points()
-                    self.painter.end()
-
-                icon = QIcon()
-                icon.addPixmap(self.pixmap, QIcon.Normal, QIcon.Off)
-                self.widget_image_browser.item(img_id).setIcon(icon)
+            self.read_thread.update_img_list(img_list, img_id_list)
+            self.read_thread.quit()
+            self.read_thread.start()
 
 
+            # for img_id in range(start_img_id, end_img_id):
+            #
+            #     image = self.data.images[img_id]
+            #     self.points_dict = image.points_dict
+            #
+            #     # read images and draw annotation
+            #     # Read images
+            #     self.pixmap = QPixmap(os.path.join(self.thumbnail_dir, image.img_name))
+            #
+            #     if not self.pixmap.isNull():
+            #         # self.pixmap = QPixmap("small.jpg")
+            #         self.orignal_size = self.pixmap.size()
+            #         self.pixmap = self.pixmap.scaled(thumbnail_size, aspectRatioMode=Qt.KeepAspectRatio)
+            #
+            #         self.painter.begin(self.pixmap)
+            #         self.draw_points()
+            #         self.painter.end()
+            #
+            #     icon = QIcon()
+            #     icon.addPixmap(self.pixmap, QIcon.Normal, QIcon.Off)
+            #     self.widget_image_browser.item(img_id).setIcon(icon)
+
+    def add_image(self, args):
+        pixmap = args[1]
+        img_id = args[0]
+        points_dict = args[2]
+        print("ADD pic" , img_id)
+
+        self.painter.begin(pixmap)
+        self.draw_points_args(points_dict)
+        self.painter.end()
+
+        icon = QIcon()
+        icon.addPixmap(pixmap, QIcon.Normal, QIcon.Off)
+        self.widget_image_browser.item(img_id).setIcon(icon)
     # def sizechanged(self):
     #     print(self.rect().size())
 
     def resizeEvent(self, e):
-        print("window size:",self.rect().size())
         self.prepare_images()
 
     def trigger_check_state(self,item):
@@ -219,6 +276,36 @@ class BrowsePanel(QWidget):
             self.parent().window().act_browse_mode.activate(QAction.Trigger)
 
 
+class ReadThumbnailThread(QThread):
+    read_one_image = pyqtSignal([list])
+
+    def __init__(self, img_list=[] , img_id_list=[]):
+        QThread.__init__(self)
+        self.img_list = img_list
+        self.img_id_list = img_id_list
+
+
+
+    def __del__(self):
+        self.wait()
+
+    def update_img_list(self, img_list, img_id_list):
+        self.img_list = img_list
+        self.img_id_list = img_id_list
+
+    def run(self):
+        for image, img_id in zip(self.img_list , self.img_id_list):
+
+            points_dict = image.points_dict
+
+            # read images and draw annotation
+            # Read images
+            pixmap = QPixmap(os.path.join('../plumage/data/vis/', image.img_name))
+            pixmap = pixmap.scaled(thumbnail_size, aspectRatioMode=Qt.KeepAspectRatio)
+
+            self.read_one_image.emit([img_id, pixmap, points_dict])
+
+            self.sleep(2)
 
 if __name__ == '__main__':
     start = timeit.default_timer()

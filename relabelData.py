@@ -82,25 +82,36 @@ class Point():
 
 class Image():
     current_pt_id = None
+    current_pt_key = None
     def __init__(self, img_name, pt_lists=None):
         self.img_name = img_name
         self.attention_flag = False
         # Points
         self.points = []
+        self.points_dict = {}
+
         if pt_lists:
             for pt in pt_lists:
                 point = Point(pt['name'], pt['x'] , pt['y'], absence=pt.get("absence", False))
-                self.points.append(point)
-            self.current_pt_id = 0
+                self.points_dict[pt['name']] = point
 
-        self.current_highlight_id = None
+            self.current_pt_key = list(self.points_dict.keys())[0]
+        self.current_highlight_key = None
+
+        # if pt_lists:
+        #     for pt in pt_lists:
+        #         point = Point(pt['name'], pt['x'] , pt['y'], absence=pt.get("absence", False))
+        #         self.points.append(point)
+        #     self.current_pt_id = 0
+        #
+        # self.current_highlight_id = None
 
     def get_current_highlight_bbox(self, scale= None):
-        if self.current_highlight_id is not None:
+        if self.current_highlight_key is not None:
             if scale is not None:
-                return (self.points[self.current_highlight_id] * scale).rect
+                return (self.points_dict[self.current_highlight_key] * scale).rect
             else:
-                return self.points[self.current_highlight_id].rect
+                return self.points_dict[self.current_highlight_key].rect
         else:
             return None
     def set_current_highlight_id(self, idx):
@@ -114,34 +125,46 @@ class Image():
         """
         self.current_pt_id = idx
 
+    def set_current_pt_key(self, key):
+        """
+        Change the id for point
+        :param idx:
+        :return:
+        """
+        self.current_pt_key = key
+
+    def set_current_pt_key_to_start(self):
+        keys = list(self.points_dict.keys())
+        if keys:
+            self.current_pt_key = keys[0]
+        else:
+            self.current_pt_key = None
+
+    def set_current_highlight_key(self, key):
+
+        self.current_highlight_key = key
+
+
     def set_points_width(self,width):
-        for pt in self.points:
+        for key,pt in self.points_dict.items():
             pt.set_point(width=width)
 
     def get_current_pt_name(self):
-        return self.points[self.current_pt_id].pt_name
+        return self.points_dict[self.current_pt_key].pt_name
 
     def get_current_pt_id(self):
         return self.current_pt_id
 
+    def get_current_pt_key(self):
+        return self.current_pt_key
+
     def get_current_pt(self):
-        return self.points[self.current_pt_id]
+        return self.points_dict[self.current_pt_key]
+        # return self.points[self.current_pt_id]
 
-    def get_current_pt_x(self):
-        return self.points[self.current_pt_id].x
-
-    def get_current_pt_y(self):
-        return self.points[self.current_pt_id].y
     def get_curent_pt_props_dict(self):
-        return self.points[self.current_pt_id].get_point_props_dict()
-
-    # def next_point(self):
-    #     if self.current_pt_id<self.pt_size-1:
-    #         self.current_pt_id = (self.current_pt_id+1)
-    #
-    # def prev_image(self):
-    #     if self.current_pt_id>0:
-    #         self.current_pt_id = (self.current_pt_id-1)
+        return self.points_dict[self.current_pt_key].get_point_props_dict()
+        # return self.points[self.current_pt_id].get_point_props_dict()
 
 class Data():
     def __init__(self, file_name = None, work_dir=None):
@@ -210,19 +233,7 @@ class Data():
             self.images.sort(key = lambda x:x.img_name, reverse = False)
         elif self.images_origin is not None:
             self.images = self.images_origin
-    def set_sort_points(self, value):
-        self.sort_points = value
 
-        self.sorting_points()
-
-    def sorting_points(self):
-
-        if self.sort_points:
-            self.points_origin = self.get_current_image().points.copy()
-            self.get_current_image().points.sort(key = lambda x:x.pt_name)
-        elif self.points_origin is not None:
-            self.get_current_image().points = self.points_origin
-            self.points_origin = None
 
     def set_image_id(self, idx):
         self.current_image_id = idx
@@ -230,7 +241,7 @@ class Data():
 
         self.current_pixmap = QPixmap(os.path.join(self.work_dir,self.get_current_image_name()))
         self.set_scale_fit_limit()
-        self.sorting_points()
+
 
     def set_work_dir(self,work_dir):
         self.work_dir = work_dir
@@ -284,7 +295,7 @@ class Data():
 
 
         if self.get_current_pt_of_current_img().check_diff(pt_name = pt_name, x= x, y=y, error = error , absence = absence,info = info):
-            self.get_current_image().get_current_pt().set_point(pt_name = pt_name, x= x, y=y, error = error, absence = absence,info = info)
+            self.get_current_pt_of_current_img().set_point(pt_name = pt_name, x= x, y=y, error = error, absence = absence,info = info)
 
             self.changed = True
             return True
@@ -308,17 +319,15 @@ class Data():
         :return: If it is possible to add point
         """
 
-        pt_names = [pt.pt_name for pt in self.get_current_image().points]
-        if not pt_names:
-            self.get_current_image().current_pt_id=0
-        if pt_name not in pt_names:
+        cur_pt_names = list(self.get_current_image_points().keys())
+        if pt_name not in cur_pt_names:
             # if the point name is not duplicate add
             if scaled_coords:
                 y = int(y/self.scale)
                 x = int(x/self.scale)
 
             temp = Point(pt_name, x, y, width = self.length, absence=False)
-            self.get_current_image().points.append(temp)
+            self.get_current_image().points_dict[pt_name]=temp
 
             self.pt_names.add(pt_name)
             self.changed = True
@@ -327,16 +336,20 @@ class Data():
         else:
             return False
 
-    def remove_pt_for_current_img(self, idx = None):
-        if idx is not None:
-            pt = self.get_current_image().points.pop(idx)
+    def remove_pt_for_current_img(self, key = None):
+        """
+        Remove the current point or point with key given
 
-        else:
-            idx = self.get_current_image().current_pt_id
-            pt = self.get_current_image().points.pop(idx)
 
-        if self.get_current_image().current_pt_id >= len(self.get_current_image().points):
-            self.get_current_image().current_pt_id = len(self.get_current_image().points)-1
+        :param idx:
+        :return:
+        """
+        if key is None:
+            key = self.get_current_image().current_pt_key
+        pt = self.get_current_image_points().pop(key)
+
+
+        self.get_current_image().set_current_pt_key_to_start()
 
         return pt
     def get_current_pt_of_current_img(self):
@@ -349,8 +362,13 @@ class Data():
             return None
 
     def get_current_image_points(self):
+        # if self.images:
+        #     return self.images[self.current_image_id].points
+        # else:
+        #     return None
+
         if self.images:
-            return self.images[self.current_image_id].points
+            return self.images[self.current_image_id].points_dict
         else:
             return None
 
@@ -371,7 +389,7 @@ class Data():
 
     def get_current_scaled_points(self):
         if self.images:
-            return [pt * self.scale for pt in self.get_current_image_points()]
+            return [pt * self.scale for key, pt in self.get_current_image_points().items()]
         else:
             return None
 
@@ -382,18 +400,36 @@ class Data():
             return False
 
     def has_points_current_image(self):
-        if self.images and self.images[self.current_image_id].points:
+        if self.images and self.images[self.current_image_id].points_dict:
             return True
         else:
             return False
 
     def toggle_flag_img(self, state):
+        """
+        Set the data as flagged mode
+        Set the current image into first flagged image
+
+        :param state: Flag mode is True or False
+        :return:
+        """
+        flagged_img_idx = []
         if state == True:
-            self.images_backup = self.images.copy()
-            self.images = [img for img in self.images if img.attention_flag == True]
+            flagged_img_idx =  [idx for idx, img in enumerate(self.images) if img.attention_flag == True]
+            if flagged_img_idx:
+                self.current_image_id = flagged_img_idx[0]
+
+            # self.images_backup = self.images.copy()
+            # self.images = [img for img in self.images if img.attention_flag == True]
         else:
-            self.images = self.images_backup
-            self.images_backup = None
+            self.current_image_id = 0
+            # self.images = self.images_backup
+            # self.images_backup = None
+
+        # if self.current_image_id >= len(self.images):
+        #     self.current_image_id =len(self.images)-1
+        return flagged_img_idx
+
 
     def write_json(self, save_name = None):
         # Create data form to save
@@ -401,7 +437,7 @@ class Data():
         for image in self.images:
             entry = {'file_name': image.img_name}
             points = []
-            for pt in image.points:
+            for key, pt in image.points_dict.items():
                 pt_data = {"name": pt.pt_name, "x": pt.x, "y": pt.y, "info": pt.info,"error": pt.error, "absence": pt.absence}
                 points.append(pt_data)
             entry['points'] = points
@@ -417,6 +453,8 @@ class Data():
 
 
 class Data_gui(Data, QObject):
+    # Date object for relabel app
+
     # Data changed signal
     signal_data_changed = pyqtSignal(bool)
     signal_has_images = pyqtSignal()
@@ -442,6 +480,7 @@ class Data_gui(Data, QObject):
     def remove_pt_for_current_img(self, idx = None):
         pt = super().remove_pt_for_current_img(idx)
 
+        self.value_change(True)
         self.push_undo({"pt_remove":pt})
 
     def add_pt_for_current_img(self, pt_name, x, y, scaled_coords= True):
@@ -474,10 +513,8 @@ class Data_gui(Data, QObject):
 
         if begin:
             self.prev_pt = copy.deepcopy(self.get_current_pt_of_current_img())
-            print(self.prev_pt.x)
         else:
             cur_pt = self.get_current_pt_of_current_img()
-            print(cur_pt.x , self.prev_pt.x)
             if cur_pt.x!= self.prev_pt.x or cur_pt.y!= self.prev_pt.y:
                 self.push_undo({"pt_edit":self.prev_pt})
 
@@ -495,30 +532,17 @@ class Data_gui(Data, QObject):
             value = act[key]
 
             if key == 'pt_add':
-                points = self.get_current_image().points
-                del_id = -1
-                for idx, pt in enumerate(points):
-                    if pt.pt_name == value:
-                        del_id = idx
-                        break
-
-                self.remove_pt_for_current_img(del_id)
+                self.remove_pt_for_current_img(value)
                 self.pop_undo()
 
             elif key == 'pt_edit':
-                # FInd the current point and then reset
-                points = self.get_current_image().points
-                del_id = -1
-                for idx, pt in enumerate(points):
-                    if pt.pt_name == value.pt_name:
-                        del_id = idx
-                        break
-                self.get_current_image().set_current_pt_id(del_id)
+                key = value.pt_name
+                self.get_current_image().set_current_pt_key(key)
                 self.set_current_pt_of_current_img(x = value.x , y =value.y)
 
 
             elif key == 'pt_remove':
-                self.get_current_image().points.append(value)
+                self.get_current_image().points_dict[value.pt_name] = value
 
             #After undo things, clean again.
 

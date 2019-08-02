@@ -68,23 +68,19 @@ class LabelPanel(QWidget):
         pos =e.pos()
 
         if e.button() == Qt.LeftButton:
-            print("click")
             mouse_in_pt = False
             # if it is on the a currrent point
-            if self.data.get_current_scaled_points():
-                self.data.get_current_image().set_current_highlight_id(None)
-                for idx, pt, in enumerate(self.data.get_current_scaled_points()):
+            points = self.data.get_current_scaled_points()
+            if points:
+                self.data.get_current_image().set_current_highlight_key(None)
+                for pt in points:
                     if not pt.absence:
                         if pt.rect.contains(pos):
                             self.open_state_moving()
-                            self.data.get_current_image().set_current_pt_id(idx)
-                            self.data.get_current_image().set_current_highlight_id(idx)
-
+                            self.data.get_current_image().set_current_pt_key(pt.pt_name)
+                            self.data.get_current_image().set_current_highlight_key(pt.pt_name)
                             self.data.cache_for_dragging(begin =True)
-
-
                             mouse_in_pt = True
-
             # Input point name
             if self.state_place_pt and mouse_in_pt is False:
                 self.add_pt(pos)
@@ -228,12 +224,16 @@ class LabelPanel(QWidget):
         if name is not False:
             if name is None or name =='':
                 QMessageBox.about(self, "Failed", "Fail to add the label\nname is empty.")
-            elif not self.data.add_pt_for_current_img(name, pos.x(), pos.y()):
+            elif self.data.add_pt_for_current_img(name, pos.x(), pos.y()):
+                self.data.get_current_image().set_current_pt_key(name)
+            else:
                 QMessageBox.about(self, "Failed", "Fail to add the label\nname is duplicate.")
-            elif self.parent():
+
+            if self.parent():
             # Add point successful and add points
                 parent = self.parent().window()
                 parent.list_point_name()
+
 
 
 
@@ -242,7 +242,7 @@ class LabelPanel(QWidget):
         # List of name choices with[None, all known names of this dataset.]
         items = [None]+sorted(self.data.pt_names)
 
-        item, ok = QInputDialog.getItem(self, 'Enter the name for this label',
+        item, ok = QInputDialog().getItem(self, 'Enter the name for this label',
          "Name:", items, current = 0, editable  = True)
 
         if ok:

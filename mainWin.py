@@ -12,7 +12,7 @@ import os
 import datetime
 from shutil import copyfile
 
-from relabelData import Data,Data_gui
+from relabelData import Data_gui
 
 PROGRAM_NAME = 'Relabelling'
 
@@ -57,6 +57,7 @@ class MainWindow(QMainWindow):
 
         self.file_dock = QDockWidget('Files', self)
         self.property_dock = QDockWidget('Annotations', self)
+
 
         self.addDockWidget(Qt.RightDockWidgetArea, self.property_dock)
         self.addDockWidget(Qt.LeftDockWidgetArea, self.file_dock)
@@ -179,6 +180,7 @@ class MainWindow(QMainWindow):
         self.menu_file = QMenu("&File", self)
         self.menu_file.addAction(self.act_open_annotations)
         self.menu_file.addAction(self.act_opendir)
+        self.menu_file.addAction(self.act_set_thumbnail_dir)
         self.menu_file.addSeparator()
         self.menu_file.addAction(self.act_save)
         self.menu_file.addAction(self.act_save_as)
@@ -235,7 +237,7 @@ class MainWindow(QMainWindow):
 
             self.list_file_names()
 
-            self.widget_browser.reset_widget()
+            # self.widget_browser.reset_widget()
 
         self.widget_folder_label.setText("Working Dir: {}".format(os.path.abspath(self.data.work_dir)))
 
@@ -250,13 +252,12 @@ class MainWindow(QMainWindow):
             self.data.set_file_name(file_name)
             self.data.set_changed(False)
 
-            self.widget_browser.reset_widget()
+            # self.widget_browser.reset_widget()
 
         self.list_file_names()
 
     def open_thumbnail_dir(self):
         print("set thumbnail dir")
-
 
     def undo(self):
         # Undo action.
@@ -305,19 +306,59 @@ class MainWindow(QMainWindow):
         # Update everything, if the file lists changed.
         self.widget_browser.reset_widget()
 
+        self.list_properties()
+
         # self.widget_anno_file_label.setText("Annotation file: {}".format(os.path.basename(self.data.file_name)))
+    def hide_file_names(self, hide, flagged_img_idx):
+
+        if hide:
+
+            for row in range(self.widget_file_list.count()):
+                if row not in flagged_img_idx:
+                    self.widget_file_list.item(row).setHidden(True)
+        else:
+            for row in range(self.widget_file_list.count()):
+                self.widget_file_list.item(row).setHidden(False)
+
 
 
     def list_point_name(self):
+        """
+        List names of points on the point name part
+        :return:
+        """
+        # self.widget_point_list.clear()
+        # points = self.data.get_current_image_points()
+        # if points is not None:
+        #     for pt in points:
+        #         self.widget_point_list.addItem(pt.pt_name)
+        #
+        #     cur_id = self.data.get_current_image().get_current_pt_id()
+        #     if cur_id is not None and cur_id<self.widget_point_list.count():
+        #         self.widget_point_list.setCurrentRow(cur_id)
+
+
         self.widget_point_list.clear()
         points = self.data.get_current_image_points()
+        print(points)
         if points is not None:
-            for pt in points:
-                self.widget_point_list.addItem(pt.pt_name)
+            keys = list(points.keys())
+            if self.act_sort_anno_names.isChecked():
+                # sort annotaions
+                keys.sort()
+                for key in keys:
+                    self.widget_point_list.addItem(key)
 
-            cur_id = self.data.get_current_image().get_current_pt_id()
-            if cur_id is not None and cur_id<self.widget_point_list.count():
-                self.widget_point_list.setCurrentRow(cur_id)
+            else:
+                for key in keys:
+                    self.widget_point_list.addItem(key)
+
+            cur_key = self.data.get_current_image().get_current_pt_key()
+
+            if cur_key is not None and cur_key in points:
+                keys = list(points.keys())
+                idx = keys.index(cur_key)
+                self.widget_point_list.setCurrentRow(idx)
 
     def list_properties(self):
 
@@ -362,16 +403,19 @@ class MainWindow(QMainWindow):
             self.widget_annotation.update()
 
             # # Set table:
-            self.list_properties()
             self.list_point_name()
+            self.list_properties()
+
 
 
     def point_list_current_item_changed(self,row):
         if row !=-1:
             idx_pt = row
-
+            key = self.widget_point_list.item(row).text()
             self.widget_point_list.setCurrentRow(idx_pt)
             self.data.get_current_image().set_current_pt_id(idx_pt)
+            self.data.get_current_image().set_current_pt_key(key)
+
             self.list_properties()
 
 
@@ -415,15 +459,30 @@ class MainWindow(QMainWindow):
 
 
     def toggle_point_mode(self):
+
         if self.act_point_mode.isChecked():
             self.widget_annotation.state_place_pt = True
         else:
             self.widget_annotation.state_place_pt = False
 
     def toggle_flag_img(self):
-        self.data.toggle_flag_img(self.act_attention_imgs_only.isChecked())
-        self.list_file_names()
+        flag_mode = self.act_attention_imgs_only.isChecked()
+        # Set the data into flag mode
+        # By hiding the non-flag images
+        flagged_img_idx = self.data.toggle_flag_img(flag_mode)
+        # Set hidden item to file list?
+
+        # self.list_file_names()
+
+        self.hide_file_names(flag_mode,flagged_img_idx)
+        self.widget_browser.hide_icons(flag_mode,flagged_img_idx)
+
+
+
+        self.widget_file_list.setCurrentRow(self.data.current_image_id)
         self.widget_annotation.update()
+
+
 
 
     def delete_point(self):
@@ -431,7 +490,7 @@ class MainWindow(QMainWindow):
         Action after click delete point
         :return:
         """
-        self.data.remove_pt_for_current_img(self.widget_point_list.currentRow())
+        self.data.remove_pt_for_current_img(self.widget_point_list.currentItem().text())
         self.list_point_name()
 
     def message_unsave(self):
@@ -441,7 +500,7 @@ class MainWindow(QMainWindow):
         """
 
         if self.data and self.data.changed:
-            reply = QMessageBox.question(self, "Message", "Do you want to save changes to {}".format(self.data.file_name),
+            reply = QMessageBox.question(self, "Saving changes?", "Do you want to save changes to {}".format(self.data.file_name),
                                       QMessageBox.Save |QMessageBox.No| QMessageBox.Cancel)
 
             if reply == QMessageBox.Save:
@@ -469,6 +528,7 @@ class MainWindow(QMainWindow):
             self.act_delete_point.setText("Delete {}".format(self.widget_point_list.currentItem().text()))
             menu.addAction(self.act_delete_point)
             menu.exec_(self.widget_point_list.viewport().mapToGlobal(position))
+
 
     def update_file_label(self, changed):
         """
@@ -510,10 +570,10 @@ class MainWindow(QMainWindow):
 
     def sort_anno_names(self):
         """
-        Sort the annotaion of name alphabetically
+        Sort the annotaion of name alphabetically. Only sort the anno lists
         :return:
         """
-        self.data.set_sort_points(self.act_sort_anno_names.isChecked())
+        # self.data.set_sort_points(self.act_sort_anno_names.isChecked())
 
         self.list_point_name()
 
