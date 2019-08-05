@@ -155,7 +155,7 @@ class MainWindow(QMainWindow):
     def init_action(self):
         self.act_opendir = QAction("&Open image dir", self, triggered=self.opendir)
         self.act_open_annotations = QAction("Open &label file", self, triggered=self.open_annotations)
-        self.act_set_thumbnail_dir = QAction("Set the folder of icons", self, triggered=self.open_thumbnail_dir)
+        # self.act_set_thumbnail_dir = QAction("Set the folder of icons", self, triggered=self.open_thumbnail_dir)
 
         self.act_save = QAction("&Save", self , shortcut="Ctrl+S", triggered=self.save_annotations)
         self.act_save_as = QAction("Save as", self, triggered=self.save_as)
@@ -180,7 +180,7 @@ class MainWindow(QMainWindow):
         self.menu_file = QMenu("&File", self)
         self.menu_file.addAction(self.act_open_annotations)
         self.menu_file.addAction(self.act_opendir)
-        self.menu_file.addAction(self.act_set_thumbnail_dir)
+        # self.menu_file.addAction(self.act_set_thumbnail_dir)
         self.menu_file.addSeparator()
         self.menu_file.addAction(self.act_save)
         self.menu_file.addAction(self.act_save_as)

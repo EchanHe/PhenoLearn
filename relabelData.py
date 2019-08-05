@@ -90,6 +90,8 @@ class Image():
         self.points = []
         self.points_dict = {}
 
+        self.label_changed = False
+
         if pt_lists:
             for pt in pt_lists:
                 point = Point(pt['name'], pt['x'] , pt['y'], absence=pt.get("absence", False))
@@ -483,6 +485,8 @@ class Data_gui(Data, QObject):
         self.value_change(True)
         self.push_undo({"pt_remove":pt})
 
+        self.set_current_img_changed(True)
+
     def add_pt_for_current_img(self, pt_name, x, y, scaled_coords= True):
         # changed = Data.add_pt_for_current_img(self, pt_name, x, y, scaled_coords)
         changed = super().add_pt_for_current_img( pt_name, x, y, scaled_coords)
@@ -490,6 +494,8 @@ class Data_gui(Data, QObject):
         self.value_change(changed)
         if changed:
             self.push_undo({"pt_add":pt_name})
+
+        self.set_current_img_changed(changed)
 
         return changed
 
@@ -505,6 +511,7 @@ class Data_gui(Data, QObject):
         changed = super().set_current_pt_of_current_img(pt_name, x,y,error,absence,info,scaled_coords)
 
         self.value_change(changed)
+        self.set_current_img_changed(changed)
 
         # if not dragging and changed:
         #     self.push_undo({"edit":prev_pt})
@@ -580,3 +587,6 @@ class Data_gui(Data, QObject):
     def set_changed(self, value):
         self.changed = value
         self.value_change(value)
+
+    def set_current_img_changed(self,value):
+        self.get_current_image().label_changed = value

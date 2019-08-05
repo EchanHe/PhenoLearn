@@ -11,8 +11,9 @@ import cv2
 import timeit
 
 item_size = QSize(350,350)
-thumbnail_size = QSize(300,300)
-point_size = QSize(5,5)
+icon_size = QSize(300,300)
+thumbnail_size = QSize(150,150)
+point_size = QSize(2,2)
 class BrowsePanel(QWidget):
 
     def __init__(self,  data = None):
@@ -46,8 +47,18 @@ class BrowsePanel(QWidget):
         self.widget_image_browser.itemDoubleClicked.connect(self.go_to_annotation)
 
 
-        self.read_thread = ReadThumbnailThread([])
-        self.read_thread.read_one_image.connect(self.add_image)
+        self.read_thread_1 = ReadThumbnailThread([])
+        self.read_thread_1.read_one_image.connect(self.add_image)
+
+        self.read_thread_2 = ReadThumbnailThread([])
+        self.read_thread_2.read_one_image.connect(self.add_image)
+
+        # self.read_img_threads = [ReadThumbnailThread([])]*3
+        #
+        # for thread in self.read_img_threads:
+        #     thread.read_one_image.connect(self.add_image)
+
+
         self.painter = QPainter()
 
 
@@ -57,6 +68,8 @@ class BrowsePanel(QWidget):
         # self.init_for_testing()
         self.init_list()
         self.thumbnail_dir = '../plumage/data/thumbnail/'
+
+
 
         # self.setMouseTracking(True)
         # self.resize.connect(self.sizechanged)
@@ -104,6 +117,8 @@ class BrowsePanel(QWidget):
             else:
                 item.setCheckState(Qt.Unchecked)
             self.widget_image_browser.addItem(item)
+
+        self.thumbnail_list = [None] * self.data.img_size
 
     def reset_widget(self):
         self.init_list()
@@ -157,8 +172,6 @@ class BrowsePanel(QWidget):
                     bbox = pt.rect
                     self.painter.drawEllipse(bbox.center()/(scale), point_size.width(), point_size.height())
 
-
-
     def prepare_images(self):
         scroll_bar = self.widget_image_browser.verticalScrollBar()
         # Calculate images to be shown in here:
@@ -186,11 +199,38 @@ class BrowsePanel(QWidget):
             #         icon = QIcon()
             #         self.widget_image_browser.item(i).setIcon(icon)
 
+
+
+
+
             # Read and load imgs:
 
-            start_img = prev_imgs -(images_per_row*images_per_col)
+            # start_img = prev_imgs -(images_per_row*images_per_col)
+            # start_img_id = max(0,start_img)
+            # end_img_id = min(image_count , start_img_id+images_per_row*(images_per_col+2))
+
+
+            start_img = prev_imgs -(images_per_row)
             start_img_id = max(0,start_img)
-            end_img_id = min(image_count , start_img_id+images_per_row*(images_per_col+2))
+            end_img_id = min(image_count , start_img_id+images_per_row*(images_per_col+1))
+
+            # Check the thumbnail cache and decide to clean cache.
+            # thumbnail cache limit is 100
+            thumbnail_list_size_limit =100
+            thumbnail_idx_list = [idx for idx,thumbnail in enumerate(self.thumbnail_list) if thumbnail is not None]
+            if len(thumbnail_idx_list)>thumbnail_list_size_limit:
+                length = len(thumbnail_idx_list)
+                emptied_count=0
+                for idx in thumbnail_idx_list:
+                    if idx < start_img or idx > end_img_id:
+                        self.thumbnail_list[idx] = None
+                        self.widget_image_browser.item(idx).setIcon(QIcon())
+                        emptied_count+=1
+
+                    if length - emptied_count<thumbnail_list_size_limit:
+                        break
+
+
 
             if self.is_icon_hide:
                 img_list = [self.data.images[img_id] for img_id in self.flagged_img_idx[start_img_id:end_img_id]]
@@ -199,13 +239,25 @@ class BrowsePanel(QWidget):
                 img_list = [self.data.images[img_id] for img_id in range(start_img_id, end_img_id)]
                 img_id_list = [img_id for img_id in range(start_img_id, end_img_id)]
 
-            print("Update the ids:" , img_id_list)
-            self.read_thread.terminate()
+            print("img id list", img_id_list)
+            self.read_thread_1.terminate()
 
-            self.read_thread.update_img_list(img_list, img_id_list)
-            self.read_thread.quit()
-            self.read_thread.start()
+            self.read_thread_1.update_img_list(img_list[:len(img_list)//2], img_id_list[:len(img_list)//2] , self.widget_image_browser)
+            self.read_thread_1.quit()
+            self.read_thread_1.start()
 
+
+            self.read_thread_2.terminate()
+
+            self.read_thread_2.update_img_list(img_list[len(img_list)//2:], img_id_list[len(img_list)//2:] , self.widget_image_browser)
+            self.read_thread_2.quit()
+            self.read_thread_2.start()
+
+            # self.read_thread.terminate()
+            #
+            # self.read_thread.update_img_list(img_list, img_id_list , self.widget_image_browser)
+            # self.read_thread.quit()
+            # self.read_thread.start()
 
             # for img_id in range(start_img_id, end_img_id):
             #
@@ -233,17 +285,24 @@ class BrowsePanel(QWidget):
         pixmap = args[1]
         img_id = args[0]
         points_dict = args[2]
-        print("ADD pic" , img_id)
 
-        self.painter.begin(pixmap)
-        self.draw_points_args(points_dict)
-        self.painter.end()
+        # print(img_id, pixmap is not None , self.data.images[img_id].label_changed)
+        if not (pixmap is None and self.data.images[img_id].label_changed == False):
+            if pixmap is not None:
+                self.thumbnail_list[img_id] = pixmap.copy()
+            elif self.data.images[img_id].label_changed:
+                pixmap = self.thumbnail_list[img_id].copy()
+                self.data.images[img_id].label_changed = False
 
-        icon = QIcon()
-        icon.addPixmap(pixmap, QIcon.Normal, QIcon.Off)
-        self.widget_image_browser.item(img_id).setIcon(icon)
-    # def sizechanged(self):
-    #     print(self.rect().size())
+            self.painter.begin(pixmap)
+            self.draw_points_args(points_dict)
+            self.painter.end()
+
+            pixmap = pixmap.scaled(icon_size, aspectRatioMode=Qt.KeepAspectRatio)
+            icon = QIcon()
+            icon.addPixmap(pixmap, QIcon.Normal, QIcon.Off)
+            self.widget_image_browser.item(img_id).setIcon(icon)
+
 
     def resizeEvent(self, e):
         self.prepare_images()
@@ -289,23 +348,29 @@ class ReadThumbnailThread(QThread):
     def __del__(self):
         self.wait()
 
-    def update_img_list(self, img_list, img_id_list):
+    def update_img_list(self, img_list, img_id_list, widget_image_browser):
         self.img_list = img_list
         self.img_id_list = img_id_list
+        self.widget_image_browser = widget_image_browser
 
     def run(self):
         for image, img_id in zip(self.img_list , self.img_id_list):
 
             points_dict = image.points_dict
 
+            if self.widget_image_browser.item(img_id).icon().isNull():
+            # If the icon is NUll, read images
+
             # read images and draw annotation
             # Read images
-            pixmap = QPixmap(os.path.join('../plumage/data/vis/', image.img_name))
-            pixmap = pixmap.scaled(thumbnail_size, aspectRatioMode=Qt.KeepAspectRatio)
+                pixmap = QPixmap(os.path.join('../plumage/data/vis/', image.img_name))
+                pixmap = pixmap.scaled(thumbnail_size, aspectRatioMode=Qt.KeepAspectRatio)
+            else:
+                pixmap = None
 
             self.read_one_image.emit([img_id, pixmap, points_dict])
 
-            self.sleep(2)
+            self.sleep(0.01)
 
 if __name__ == '__main__':
     start = timeit.default_timer()
