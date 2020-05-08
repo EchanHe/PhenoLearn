@@ -6,13 +6,12 @@ import relabelData
 
 from math import ceil, floor
 import cv2
-
-
 import timeit
+import numpy as np
 
 item_size = QSize(350,350)
 icon_size = QSize(300,300)
-thumbnail_size = QSize(150,150)
+thumbnail_size = QSize(300,300)
 point_size = QSize(2,2)
 class BrowsePanel(QWidget):
 
@@ -47,10 +46,10 @@ class BrowsePanel(QWidget):
         self.widget_image_browser.itemDoubleClicked.connect(self.go_to_annotation)
 
 
-        self.read_thread_1 = ReadThumbnailThread([])
+        self.read_thread_1 = ReadThumbnailThread()
         self.read_thread_1.read_one_image.connect(self.add_image)
 
-        self.read_thread_2 = ReadThumbnailThread([])
+        self.read_thread_2 = ReadThumbnailThread()
         self.read_thread_2.read_one_image.connect(self.add_image)
 
         # self.read_img_threads = [ReadThumbnailThread([])]*3
@@ -60,16 +59,13 @@ class BrowsePanel(QWidget):
 
 
         self.painter = QPainter()
-
+        self.painter.setCompositionMode(QPainter.CompositionMode_Source)
 
         self.layout.addWidget(self.widget_image_browser)
         self.setLayout(self.layout)
 
         # self.init_for_testing()
         self.init_list()
-        self.thumbnail_dir = '../plumage/data/thumbnail/'
-
-
 
         # self.setMouseTracking(True)
         # self.resize.connect(self.sizechanged)
@@ -118,7 +114,12 @@ class BrowsePanel(QWidget):
                 item.setCheckState(Qt.Unchecked)
             self.widget_image_browser.addItem(item)
 
+
         self.thumbnail_list = [None] * self.data.img_size
+
+        self.read_thread_1.work_dir = self.data.work_dir
+        self.read_thread_2.work_dir = self.data.work_dir
+
 
     def reset_widget(self):
         self.init_list()
@@ -130,35 +131,21 @@ class BrowsePanel(QWidget):
             for row in range(self.widget_image_browser.count()):
                 if row not in flagged_img_idx:
                     self.widget_image_browser.item(row).setHidden(True)
+                else:
+                    self.widget_image_browser.item(row).setHidden(False)
         else:
             for row in range(self.widget_image_browser.count()):
                 self.widget_image_browser.item(row).setHidden(False)
 
 
-    def draw_points(self):
-                # From the scale point , draw points
-        scale = max(self.orignal_size.width()/thumbnail_size.width(), self.orignal_size.height()/thumbnail_size.height())
-
-        thumbnail_scale = int(self.data.current_pixmap.width() / self.orignal_size.width())
-
-        # self.painter.scale(1/scale,1/scale)
-
-        # self.painter.scale(1/scale,1/scale)
-
-        pen = QPen(Qt.red, 2)
-        brush = QBrush(QColor(0, 255, 255, 120))
-        self.painter.setPen(pen)
-        self.painter.setBrush(brush)
-
-
-        if self.points_dict:
-            for key, pt in self.points_dict.items():
-                if not pt.absence:
-                    bbox = pt.rect
-                    self.painter.drawEllipse(bbox.center()/(thumbnail_scale*scale), point_size.width(), point_size.height())
-                    # self.painter.drawEllipse(100,100, bbox.width()//2, bbox.height()//2)
-
     def draw_points_args(self ,points_dict):
+        """
+        Draw keypoint based on the scale (original reso / thumbnail reso)
+
+        :return:
+        """
+
+
         scale = max(self.data.current_pixmap.width()/thumbnail_size.width(), self.data.current_pixmap.height()/thumbnail_size.height())
 
         pen = QPen(Qt.red, 2)
@@ -172,7 +159,57 @@ class BrowsePanel(QWidget):
                     bbox = pt.rect
                     self.painter.drawEllipse(bbox.center()/(scale), point_size.width(), point_size.height())
 
+    def draw_seg_args(self, segments_cv):
+        """
+        Draw segmentations based on the scale
+        :param segment_dict:
+        :return:
+        """
+
+        scale = max(self.data.current_pixmap.width()/thumbnail_size.width(), self.data.current_pixmap.height()/thumbnail_size.height())
+
+        height = int(self.data.get_current_origin_pixmap().height() /scale)
+        width = int(self.data.get_current_origin_pixmap().width() /scale)
+
+        # scaled zero
+        img_cv_draw = np.zeros((height, width ,4)).astype('uint8')
+        img_cv_draw = cv2.cvtColor(img_cv_draw,cv2.COLOR_BGRA2RGBA)
+
+        # Draw the segmentations using segmentaion cv
+        if segments_cv:
+            for (_, item), color in zip(segments_cv.items() , self.parent().window().seg_colours):
+                contour_cv = item['contours']
+                self.draw_seg_cv(img_cv_draw,contour_cv , color , scale)
+
+        image_cv_draw = QImage(img_cv_draw, img_cv_draw.shape[1],\
+        img_cv_draw.shape[0], img_cv_draw.shape[1] * 4,QImage.Format_RGBA8888)
+
+        return QPixmap(image_cv_draw)
+        # self.canvas  = QPixmap(image_cv_draw)
+
+
+
+    def draw_seg_cv(self,img_cv_draw,contour_cv,color,scale):
+        """
+        Draw opencv image using contours
+        Convert img to qpixmap
+
+        """
+        if contour_cv is not None:
+            contour_cv = [(np.array(contour, dtype='int32') //scale).astype('int32') for contour in contour_cv]
+            cv_colour = (color.red() , color.green() , color.blue() ,color.alpha())
+            print("cv colour in LabelPanel.draw_seg_cv" , cv_colour)
+            cv2.fillPoly(img_cv_draw, contour_cv, cv_colour)
+            img_cv_draw[img_cv_draw[...,3] >0 , : ] = cv_colour
+######## end draw segmentation ####
+
+
     def prepare_images(self):
+        """
+        Action of visualiasing when scrolling.
+        :return:
+        """
+
         scroll_bar = self.widget_image_browser.verticalScrollBar()
         # Calculate images to be shown in here:
         image_count = len(self.data.images)
@@ -193,21 +230,6 @@ class BrowsePanel(QWidget):
             prev_imgs = prev_rows * images_per_row
 
 
-            # # Clear all images
-            # if prev_imgs-images_per_row >= 0:
-            #     for i in range(prev_imgs-images_per_row, prev_imgs):
-            #         icon = QIcon()
-            #         self.widget_image_browser.item(i).setIcon(icon)
-
-
-
-
-
-            # Read and load imgs:
-
-            # start_img = prev_imgs -(images_per_row*images_per_col)
-            # start_img_id = max(0,start_img)
-            # end_img_id = min(image_count , start_img_id+images_per_row*(images_per_col+2))
 
 
             start_img = prev_imgs -(images_per_row)
@@ -253,38 +275,16 @@ class BrowsePanel(QWidget):
             self.read_thread_2.quit()
             self.read_thread_2.start()
 
-            # self.read_thread.terminate()
-            #
-            # self.read_thread.update_img_list(img_list, img_id_list , self.widget_image_browser)
-            # self.read_thread.quit()
-            # self.read_thread.start()
-
-            # for img_id in range(start_img_id, end_img_id):
-            #
-            #     image = self.data.images[img_id]
-            #     self.points_dict = image.points_dict
-            #
-            #     # read images and draw annotation
-            #     # Read images
-            #     self.pixmap = QPixmap(os.path.join(self.thumbnail_dir, image.img_name))
-            #
-            #     if not self.pixmap.isNull():
-            #         # self.pixmap = QPixmap("small.jpg")
-            #         self.orignal_size = self.pixmap.size()
-            #         self.pixmap = self.pixmap.scaled(thumbnail_size, aspectRatioMode=Qt.KeepAspectRatio)
-            #
-            #         self.painter.begin(self.pixmap)
-            #         self.draw_points()
-            #         self.painter.end()
-            #
-            #     icon = QIcon()
-            #     icon.addPixmap(self.pixmap, QIcon.Normal, QIcon.Off)
-            #     self.widget_image_browser.item(img_id).setIcon(icon)
-
     def add_image(self, args):
+        """
+        Draw thumbnail images, points and segmentation
+
+        """
+
         pixmap = args[1]
         img_id = args[0]
         points_dict = args[2]
+        segments_cv = args[3]
 
         # print(img_id, pixmap is not None , self.data.images[img_id].label_changed)
         if not (pixmap is None and self.data.images[img_id].label_changed == False):
@@ -296,7 +296,13 @@ class BrowsePanel(QWidget):
 
             self.painter.begin(pixmap)
             self.draw_points_args(points_dict)
+
+            self.painter.drawPixmap(0,0,self.draw_seg_args(segments_cv))
+
             self.painter.end()
+
+
+
 
             pixmap = pixmap.scaled(icon_size, aspectRatioMode=Qt.KeepAspectRatio)
             icon = QIcon()
@@ -309,7 +315,7 @@ class BrowsePanel(QWidget):
 
     def trigger_check_state(self,item):
         """
-        Put attention flag on image
+        Put flag on images
 
         :param item:
         :return:
@@ -338,10 +344,11 @@ class BrowsePanel(QWidget):
 class ReadThumbnailThread(QThread):
     read_one_image = pyqtSignal([list])
 
-    def __init__(self, img_list=[] , img_id_list=[]):
+    def __init__(self, img_list=[] , img_id_list=[] , work_dir = None):
         QThread.__init__(self)
         self.img_list = img_list
         self.img_id_list = img_id_list
+        self.work_dir = work_dir
 
 
 
@@ -357,18 +364,20 @@ class ReadThumbnailThread(QThread):
         for image, img_id in zip(self.img_list , self.img_id_list):
 
             points_dict = image.points_dict
+            segments_cv = image.segments_cv
 
             if self.widget_image_browser.item(img_id).icon().isNull():
             # If the icon is NUll, read images
 
             # read images and draw annotation
             # Read images
-                pixmap = QPixmap(os.path.join('../plumage/data/vis/', image.img_name))
+
+                pixmap = QPixmap(os.path.join(self.work_dir, image.img_name))
                 pixmap = pixmap.scaled(thumbnail_size, aspectRatioMode=Qt.KeepAspectRatio)
             else:
                 pixmap = None
 
-            self.read_one_image.emit([img_id, pixmap, points_dict])
+            self.read_one_image.emit([img_id, pixmap, points_dict,segments_cv])
 
             self.sleep(0.01)
 
@@ -376,7 +385,7 @@ if __name__ == '__main__':
     start = timeit.default_timer()
 
     app = QApplication(sys.argv)
-    ex = BrowsePanel(init = True)
+    ex = BrowsePanel()
 
     stop = timeit.default_timer()
     ex.show()

@@ -2,18 +2,153 @@
 # -*- coding: utf-8 -*-
 
 from PyQt5.QtCore import *
-from PyQt5.QtGui import QPixmap, QImageReader
+from PyQt5.QtGui import QPixmap, QImageReader, QPolygon, QImage
 import os
 from pathlib import Path
 import json
 from math import ceil
 import copy
-
+import numpy as np
+import cv2
 pixmap_max_size_limit = QSize(1300,700)
 pixmap_min_size_limit = QSize(400,200)
 
 rect_length_prop = 0.015
 min_rect_length = 20
+
+
+def convert(o):
+    if isinstance(o, np.int64): return int(o)
+    if isinstance(o, list): return [int(i) for i in o]
+    raise TypeError
+
+def find_hierarchy_level(hierarchy):
+    level = [0] * len(hierarchy)
+
+    for i in range(len(hierarchy)):
+        level[i] = find_level(0 , i, hierarchy)
+    return level
+
+def find_level(input_level , pos, hierarchy):
+    if hierarchy[pos][3] < 0 :
+        return input_level
+    else:
+        input_level = find_level(input_level, hierarchy[pos][3], hierarchy)
+        return input_level +1
+
+def find_all_children(idx, hierarchy):
+    if hierarchy[idx][2]<0:
+        return None
+    else:
+        children = []
+        children.append(hierarchy[idx][2])
+        child_idx = hierarchy[idx][2]
+
+        # Only check next kids
+
+        while True:
+
+            if hierarchy[child_idx][0]<0:
+                break
+            else:
+                children.append(hierarchy[child_idx][0])
+
+                child_idx = hierarchy[child_idx][0]
+
+        return children
+
+def find_neighbour(idx,  hierarchy, children):
+    if hierarchy[idx][0]>=0:
+        children.append(hierarchy[idx][0])
+        find_neighbour(hierarchy[idx][0] , hierarchy, children)
+    if hierarchy[idx][1]>=0:
+        children.append(hierarchy[idx][1])
+        find_neighbour(hierarchy[idx][1], hierarchy, children)
+
+
+
+def find_children(idx, hierarchy, children):
+    if hierarchy[idx][2]<0:
+        return children
+    else:
+        if children is None:
+            children = [hierarchy[idx][2]]
+        else:
+            children.append(hierarchy[idx][2])
+        print(children)
+        child_idx = hierarchy[idx][2]
+        if hierarchy[child_idx][0]>=0:
+            find_children(hierarchy[child_idx][0], hierarchy, children)
+        if hierarchy[child_idx][1]>=0:
+            find_children(hierarchy[child_idx][1], hierarchy, children)
+
+
+
+class Segment():
+    def __init__(self, segment_name,  contours = {} , hierarchy = None, error = False,info = None, absence = False):
+
+        self.set_segment(segment_name,  contours = contours , hierarchy = hierarchy,
+                         error = error,info = info, absence = absence)
+
+
+
+    def set_segment(self, segment_name,  contours , hierarchy, error ,info , absence):
+        self.segment_name = segment_name
+        self.contours = contours
+
+        self.error = error
+        self.info = info
+        self.absence = absence
+
+        if hierarchy is None:
+            hierarchy = [0] * len(contours)
+
+        self.hierarchy = hierarchy
+
+        # self.polygons = []
+        self.cv_contours = []
+        for _, contour in self.contours.items():
+            cv_contour =np.array([[[pt['x'] , pt['y']] for pt in contour["coords"]]])
+            cv_contour = cv_contour.astype(np.int32)
+            self.cv_contours.append(cv_contour)
+        #
+        #
+        # # if len(self.polygons)>1:
+        # #     print(self.polygons[0].subtracted(self.polygons[1]).boundingRect())
+        # #     print(self.polygons[1].subtracted(self.polygons[0]).boundingRect())
+        #
+        #
+        # self.contours_test = []
+        #
+        # for contour, level, child in zip(self.contours, self.hierarchy["level"], self.hierarchy["child"]):
+        #     self.contours_test.append({"coords": contour, "level":level , "child":child})
+
+
+    def __mul__(self, factor):
+
+        contours =copy.deepcopy( self.contours)
+        for _, contour in contours.items():
+            for coord in contour['coords']:
+                coord['x'] *=factor
+                coord['y'] *=factor
+        # for coords in contours['coords']:
+        #     for coord in coords:
+        #         coord['x'] *=factor
+        #         coord['y'] *=factor
+
+        # contours['coords'] = []
+        # for coords in self.contours['coords']
+        #
+        #     coords_new = [{"x":pt["x"] * factor, "y":pt["y"] * factor} for pt in coords]
+        #
+        #     contours["coords"] = coords
+
+
+
+
+        return Segment(segment_name = self.segment_name, contours = contours,hierarchy = self.hierarchy,
+                       error=self.error, info=self.info, absence=self.absence)
+
 
 class Point():
     def __init__(self, pt_name, x, y, width = 10, error = False,info = None, absence = False):
@@ -83,30 +218,43 @@ class Point():
 class Image():
     current_pt_id = None
     current_pt_key = None
-    def __init__(self, img_name, pt_lists=None):
+    def __init__(self, img_name, pts_list=None, segments_list = None, segments_cv_list = None, property =None):
         self.img_name = img_name
         self.attention_flag = False
         # Points
-        self.points = []
+        # self.points = []
         self.points_dict = {}
+
+        self.segments = {}
+
 
         self.label_changed = False
 
-        if pt_lists:
-            for pt in pt_lists:
+        if pts_list:
+            for pt in pts_list:
                 point = Point(pt['name'], pt['x'] , pt['y'], absence=pt.get("absence", False))
                 self.points_dict[pt['name']] = point
 
+        if segments_list:
+            for segment in segments_list:
+                temp = Segment(segment['name'], segment['contours'])
+                self.segments[segment['name']] = temp
+
+        if segments_cv_list:
+            self.segments_cv = segments_cv_list
+        else:
+            self.segments_cv = {}
+
+        ## specimen property
+        self.property = property
+
+
+        if len(self.points_dict)!=0:
             self.current_pt_key = list(self.points_dict.keys())[0]
+        else:
+            self.current_pt_key = None
         self.current_highlight_key = None
 
-        # if pt_lists:
-        #     for pt in pt_lists:
-        #         point = Point(pt['name'], pt['x'] , pt['y'], absence=pt.get("absence", False))
-        #         self.points.append(point)
-        #     self.current_pt_id = 0
-        #
-        # self.current_highlight_id = None
 
     def get_current_highlight_bbox(self, scale= None):
         if self.current_highlight_key is not None:
@@ -151,6 +299,7 @@ class Image():
         for key,pt in self.points_dict.items():
             pt.set_point(width=width)
 
+
     def get_current_pt_name(self):
         return self.points_dict[self.current_pt_key].pt_name
 
@@ -176,8 +325,8 @@ class Data():
         :param file_name: annotation file
         :param work_dir: working directory for images
         """
-        self.images= []
-        self.pt_names = set()
+        self.img_size=0
+
 
         self.work_dir = work_dir
 
@@ -199,6 +348,11 @@ class Data():
     def init_images(self):
         self.images = []
         self.pt_names = set()
+        self.seg_names = set()
+        self.img_props = {}
+
+
+
         if self.work_dir is not None:
             # Get list of images
             extensions = ['.%s' % fmt.data().decode("ascii").lower() for fmt in QImageReader.supportedImageFormats()]
@@ -211,10 +365,38 @@ class Data():
                 # Init images list
                 for entry in data:
                     if entry['file_name'] in work_dir_file_names:
-                        image = Image(entry['file_name'] , entry['points'])
+                        image = Image(entry['file_name'] ,
+                                       entry.get('points', None),
+                                      entry.get('outlines', None),
+                                      entry.get("outlines_cv" , None),
+                                      entry.get("property", None)
+                                      )
                         self.images.append(image)
+                        # Update points names of all
                         for pt in entry['points']:
                             self.pt_names.add(pt['name'])
+
+                        #Update seg name for all seg
+                        for key,_ in entry['outlines_cv'].items():
+                            self.seg_names.add(key)
+
+                        #Update outline names
+                        for key,item in entry['property'].items():
+
+                            if type(item) is str:
+                                # Categorical
+                                if key in self.img_props:
+                                    self.img_props[key].append(item)
+                                else:
+                                    self.img_props[key] = [item]
+                            else:
+                                # Numerical
+                                if key not in self.img_props:
+                                    self.img_props[key] = None
+
+
+
+
             else:
             # without annotation file
                 for name in work_dir_file_names:
@@ -227,6 +409,10 @@ class Data():
             if self.img_size !=0:
                 self.current_pixmap = QPixmap(os.path.join(self.work_dir,self.get_current_image_name()))
                 self.set_scale_fit_limit()
+
+            self.filter_idx = list(range(0,self.img_size))
+            self.sort_idx = list(range(0,self.img_size))
+            self.flagged_img_idx= []
 
 
     def sort(self, value):
@@ -304,11 +490,24 @@ class Data():
         else:
             return False
 
+    def check_new_name_in_current_point_dict(self, name):
+        if name in list(self.get_current_image().points_dict.keys()):
+            return False
+        else:
+            current_key = self.get_current_image().current_pt_key
+
+            self.get_current_image().points_dict[name] = self.get_current_image().points_dict[current_key]
+            # self.get_current_image().points_dict[current_key] = None
+            self.get_current_image().points_dict.pop(current_key)
+
+            self.get_current_image().set_current_pt_key(name)
+
+            return True
+
     def set_current_pt_of_current_img_dict(self, pt_prop):
 
         self.set_current_pt_of_current_img(pt_name = pt_prop.get('pt_name', None), x = pt_prop.get('x', None), y = pt_prop.get('y', None),
                                       absence = pt_prop.get('absence', None) , error = pt_prop.get('error', None) )
-
 
 
     def add_pt_for_current_img(self, pt_name, x, y, scaled_coords= True):
@@ -338,6 +537,117 @@ class Data():
         else:
             return False
 
+    def add_seg_for_current_img(self, seg_name):
+        """
+        Add the segmentation name
+        """
+
+        cur_seg_names = list(self.get_current_image_segments_cv().keys())
+        if seg_name not in cur_seg_names:
+            self.get_current_image_segments_cv()[seg_name]={"contours":None}
+            self.seg_names.add(seg_name)
+
+            return True
+        else:
+            return False
+
+
+
+    # Deprecated
+    def trans_current_segment_to_contour(self, segment, segment_name):
+        #turn canvas into images
+        image = segment.toImage()
+        print(image.format())
+        image = image.convertToFormat(QImage.Format_RGBA8888)
+        print(image.format())
+        s = image.bits().asstring(image.width()*image.height() * 4)
+        arr = np.fromstring(s, dtype=np.uint8).reshape((image.height(),image.width() ,4))
+
+        # arr_255 = np.interp(arr,[np.min(arr),np.max(arr)],[0,255]).astype(np.uint8)
+
+        mask = arr[:,:,3]
+
+        print(np.max(mask) , np.min(mask))
+
+        print(arr[arr[:,:,0] !=0,:0])
+
+        print(np.sum(arr[:,:,:3] == np.array([220,20,60])))
+        _,thresh = cv2.threshold(mask,2,255,0)
+
+        _, contours, hierarchy = cv2.findContours(thresh,cv2.RETR_TREE,cv2.CHAIN_APPROX_SIMPLE)
+        # cv2.drawContours(arr, contours, -1, (0,255,0), 3)
+        # cv2.imwrite(os.path.join("mat_test/contour" , "contour.jpg") , arr)
+
+        segments = self.get_current_image_segments()
+        # key_0 = list(segments.keys())[0]
+        scale = self.origin_scale
+        # example of setting 0 index outline
+        segment = segments[segment_name]
+
+
+        new_contours = {}
+        levels = find_hierarchy_level(hierarchy[0])
+
+        for idx, contour in enumerate(contours):
+            # children = None
+            # find_children(idx, hierarchy[0], children)
+
+            children = find_all_children(idx, hierarchy[0])
+
+            if children is not None:
+                children = [int(child) for child in children]
+
+            new_contours[str(idx)] = {"child": children,
+                                      "level": levels[idx],
+                                      "coords":[{"x": round(pt[0][0] / scale) ,"y": round(pt[0][1] / scale) } for  pt in contour]}
+
+        # Turn opencv contours into relabel contour format
+
+        segments[segment_name].set_segment(segment.segment_name, new_contours, hierarchy=None ,
+                            error = segment.error , info = segment.info , absence=segment.absence)
+
+    def trans_current_segment_to_contour_cv(self, segment, segment_name, contour_colour):
+        """
+        Convert the segmentaion from images to
+        :param canvas:
+        :param contour_name:
+        :return:
+        """
+        image = segment.toImage()
+
+        image = image.convertToFormat(QImage.Format_RGBA8888)
+
+        s = image.bits().asstring(image.width()*image.height() * 4)
+        arr = np.fromstring(s, dtype=np.uint8).reshape((image.height(),image.width() ,4))
+
+        # arr_255 = np.interp(arr,[np.min(arr),np.max(arr)],[0,255]).astype(np.uint8)
+
+        ## only the mask for the current category
+        cv_colour = (contour_colour.red() , contour_colour.green() , contour_colour.blue() ,contour_colour.alpha())
+
+        img_mask = arr[:,:,:3] != cv_colour[:3]
+        mask_final = np.logical_and(img_mask[...,0], img_mask[...,1],img_mask[...,2])
+        arr[mask_final,3] =0
+
+
+
+        mask = arr[:,:,3]
+
+        _,thresh = cv2.threshold(mask,2,255,0)
+
+
+        height = self.get_current_origin_pixmap().height()
+        width = self.get_current_origin_pixmap().width()
+
+        thresh = cv2.resize(thresh,(width , height))
+
+        _, contours, hierarchy = cv2.findContours(thresh,cv2.RETR_TREE,cv2.CHAIN_APPROX_SIMPLE)
+
+
+        contours = [contour.tolist() for contour in contours]
+        self.get_current_image_segments_cv()[segment_name]['contours'] = contours
+
+
     def remove_pt_for_current_img(self, key = None):
         """
         Remove the current point or point with key given
@@ -354,6 +664,25 @@ class Data():
         self.get_current_image().set_current_pt_key_to_start()
 
         return pt
+
+    def remove_seg_for_current_img(self, key = None):
+        """
+        Remove the current segmentation or segmentation with key given
+
+
+        :param idx:
+        :return:
+        """
+        if key is None:
+            key = self.get_current_image().current_pt_key
+
+
+        seg = self.get_current_image_segments_cv().pop(key , None)
+
+
+        return seg
+
+
     def get_current_pt_of_current_img(self):
         return self.images[self.current_image_id].get_current_pt()
 
@@ -374,6 +703,29 @@ class Data():
         else:
             return None
 
+    def get_current_image_segments(self):
+
+        if self.images:
+            return self.images[self.current_image_id].segments
+        else:
+            return None
+
+    def get_current_image_scaled_segments(self):
+        outlines = self.get_current_image_segments()
+
+        if outlines:
+            return {key : outline * self.scale for key, outline in outlines.items()}
+        else:
+            return None
+
+
+    def get_current_image_segments_cv(self):
+        if self.images:
+            return self.images[self.current_image_id].segments_cv
+        else:
+            return None
+
+
     def get_current_image_name(self):
         return self.images[self.current_image_id].img_name
 
@@ -385,6 +737,7 @@ class Data():
 
     def get_current_scaled_pixmap(self):
         return self.current_pixmap.scaled(self.scale *  self.current_pixmap.size() , Qt.KeepAspectRatio)
+
 
     def get_current_origin_pixmap(self):
         return self.current_pixmap
@@ -410,19 +763,22 @@ class Data():
     def toggle_flag_img(self, state):
         """
         Set the data as flagged mode
-        Set the current image into first flagged image
+        Intersect ( flag idx, self.filter_idx)
+
+        Change the current image into first flagged image
 
         :param state: Flag mode is True or False
-        :return:
+        :return: indices of flagged images
         """
-        flagged_img_idx = []
-        if state == True:
-            flagged_img_idx =  [idx for idx, img in enumerate(self.images) if img.attention_flag == True]
-            if flagged_img_idx:
-                self.current_image_id = flagged_img_idx[0]
 
-            # self.images_backup = self.images.copy()
-            # self.images = [img for img in self.images if img.attention_flag == True]
+        if state == True:
+            self.flagged_img_idx =  [idx for idx, img in enumerate(self.images) if img.attention_flag == True]
+
+            self.flagged_img_idx = list(set(self.filter_idx) & set(self.flagged_img_idx))
+
+            if self.flagged_img_idx:
+                self.current_image_id = self.flagged_img_idx[0]
+
         else:
             self.current_image_id = 0
             # self.images = self.images_backup
@@ -430,26 +786,60 @@ class Data():
 
         # if self.current_image_id >= len(self.images):
         #     self.current_image_id =len(self.images)-1
-        return flagged_img_idx
+        return self.flagged_img_idx
 
+    def filter_imgs_by_review_assist(self, filtered_dict):
+        """
+        Change the current image into first flagged image
+        Intersect ( flag idx, self.filter_idx)
+
+        :return: indices of ticked images.
+        """
+        all_idx = list(range(0,self.img_size))
+        for prop_key, filtered_items in filtered_dict.items():
+            filter_idx = list(np.where(np.isin(self.img_props[prop_key], filtered_items)==True)[0])
+            all_idx = list(set(all_idx) & set(filter_idx))
+        print("all idx",all_idx)
+        self.filter_idx = all_idx
+        # self.filter_idx = list(set(self.filter_idx) & set(self.flagged_img_idx))
+
+
+        if self.filter_idx:
+            self.current_image_id = self.filter_idx[0]
+        return self.filter_idx
 
     def write_json(self, save_name = None):
         # Create data form to save
         image_list = []
         for image in self.images:
             entry = {'file_name': image.img_name}
+            # points list
             points = []
             for key, pt in image.points_dict.items():
                 pt_data = {"name": pt.pt_name, "x": pt.x, "y": pt.y, "info": pt.info,"error": pt.error, "absence": pt.absence}
                 points.append(pt_data)
             entry['points'] = points
+
+
+
+            entry['outlines_cv'] = image.segments_cv
+
+            # Use the segmentation cv instead
+
+            # segments = []
+            # for key, seg in image.segments.items():
+            # #     contour_data =
+            #     seg_data = {"name": seg.segment_name, "contours": seg.contours}
+            #     segments.append(seg_data)
+            # entry['outlines'] = segments
+
             image_list.append(entry)
 
         if save_name is None:
             save_name = self.file_name
 
         with open(save_name, 'w') as write:
-            json.dump(image_list, write)
+            json.dump(image_list, write , default=convert)
 
         self.changed = False
 

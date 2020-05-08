@@ -25,6 +25,14 @@ def create_table_item(value, editbale = True):
         temp_item.setFlags(item_flag & ~Qt.ItemIsEditable)
     return temp_item
 
+def iter_all_list_items(self):
+    for i in range(self.count()):
+        yield self.item(i)
+
+def iter_all_tab_widgets(self):
+    for i in range(self.count()):
+        yield self.tabText(i), self.widget(i)
+
 class MainWindow(QMainWindow):
 
     def __init__(self):
@@ -33,11 +41,23 @@ class MainWindow(QMainWindow):
         self.initUI()
 
     def init_load_files_test(self):
-        self.file_name = 'genus.json'
-        self.work_dir = '../plumage/data/vis/'
+
+        self.seg_colours = [QColor(220,20,60,100), QColor(255,165,0,100),
+                            QColor(238,232,170,102), QColor(255,255,0,103),
+                            QColor(124,252,0,104), QColor(46,139,87,105),
+                            QColor(0,255,255,106), QColor(0,0,255,107)]
+
+        # self.file_name = 'genus.json'
+
+        # self.file_name = 'genus_outline_long.json'
+        # self.work_dir = '../plumage/data/vis/'
+
+        # self.file_name = 'data/test_1/12_OUTLINE.json'
+        # self.file_name = 'data/test_1/12_OUTLINE_hollow_cv_format.json'
+        # self.work_dir = 'data/test_1/'
         # self.work_dir = '.'
 
-        self.data = Data_gui(self.file_name, self.work_dir)
+        # self.data = Data_gui(self.file_name, self.work_dir)
         # self.data = Data_gui(None, self.work_dir)
         # self.list_file_names()
 
@@ -62,6 +82,33 @@ class MainWindow(QMainWindow):
         self.addDockWidget(Qt.RightDockWidgetArea, self.property_dock)
         self.addDockWidget(Qt.LeftDockWidgetArea, self.file_dock)
 
+
+        # Review assistant
+
+        self.widget_review_assist = QWidget()
+
+        self.widget_review_assist_combobox = QComboBox()
+        self.widget_review_assist_combobox.currentTextChanged.connect(self.list_review_assist_props)
+
+        self.button_review_sort = QPushButton('Sort')
+        self.buttone_review_reset= QPushButton('Reset')
+
+        self.widget_review_tab = QTabWidget()
+
+        # To be removed
+        self.widget_review_properties = QListWidget()
+        self.widget_review_properties.itemChanged.connect(self.widget_review_properties_item_click_filter)
+        # end #
+
+
+        layout = QVBoxLayout(self.widget_review_assist)
+        layout.addWidget(QLabel("Review Assistant"))
+        layout.addWidget(self.widget_review_assist_combobox)
+        layout.addWidget(self.button_review_sort)
+
+        layout.addWidget(self.widget_review_tab)
+        layout.addWidget(self.buttone_review_reset)
+
         # File list part
         self.widget_file_list = QListWidget()
 
@@ -76,22 +123,62 @@ class MainWindow(QMainWindow):
         layout_file_dock.addWidget((self.widget_anno_file_label))
         layout_file_dock.addWidget(self.widget_folder_label)
         layout_file_dock.addWidget(self.widget_file_list)
+
+        layout_file_dock.addWidget(self.widget_review_assist)
+
+        ### splitter
+        # self.splitter_file = QSplitter(Qt.Vertical)
+        # self.splitter_file.addWidget(self.widget_file_list)
+        # self.splitter_file.addWidget(self.widget_review_assist)
+        # self.splitter_file.setStretchFactor(1, 1)
+        # # self.splitter_file.setSizes([100,200])
+        # layout_file_dock.addWidget(self.splitter_file)
+
         widget_file_dock = QWidget()
         widget_file_dock.setLayout(layout_file_dock)
         self.file_dock.setWidget(widget_file_dock)
 
-        # Annotation part, tabs
+        #self.widget_segment_combobox.activated[str].connect(self.contour_combobox_activated)
+
+        #### Annotation Panel ####
         self.widget_anno_tabs = QTabWidget()
 
+        # Point list panel
         self.widget_point_list = QListWidget()
         self.widget_point_list.currentRowChanged.connect(self.point_list_current_item_changed)
 
-        self.widget_contour_list = QListWidget()
+        # segmentation list panel
+        self.widget_segment = QWidget()
+        self.widget_segment_list = QListWidget()
+        self.widget_segment_list.itemChanged.connect(self.update_segment_drawing)
+
+        self.widget_segment_combobox = QComboBox()
+        self.widget_segment_combobox.activated[str].connect(self.contour_combobox_activated)
+
+        self.widget_segment_control = QWidget()
+        # Add and delete
+        self.button_add_seg = QPushButton('add')
+        self.button_del_seg = QPushButton('remove')
+
+        self.button_add_seg.clicked.connect(self.add_segmentation)
+        self.button_del_seg.clicked.connect(self.delete_segmentaion)
+
+
+
+        layout = QHBoxLayout(self.widget_segment_control)
+        layout.addWidget(self.widget_segment_combobox)
+        layout.addWidget(self.button_add_seg )
+        layout.addWidget(self.button_del_seg )
+
+
+        layout = QVBoxLayout(self.widget_segment)
+        layout.addWidget(self.widget_segment_control)
+        layout.addWidget(self.widget_segment_list)
 
         self.widget_anno_tabs.addTab(self.widget_point_list, "points")
-        self.widget_anno_tabs.addTab(self.widget_contour_list, "outlines")
+        self.widget_anno_tabs.addTab(self.widget_segment, "Segments")
 
-        #properties part
+        #### Properties editor
         self.widget_props_table = QTableWidget(0,1)
         self.widget_props_table.itemChanged.connect(self.prop_table_item_changed)
 
@@ -140,6 +227,8 @@ class MainWindow(QMainWindow):
         self.widget_stack.addWidget(self.scroll_area)
         self.widget_stack.addWidget(self.widget_browser)
 
+        # self.widget_segment_list.itemClicked.connect(self.widget_annotation.update)
+
 
         self.init_action()
         self.init_menu()
@@ -152,9 +241,14 @@ class MainWindow(QMainWindow):
         self.list_file_names()
 
 
+
+        # icon = QPixmap(10,10)
+        # icon.fill(self.seg_colours[0])
+        # self.widget_annotation.setCursor(QCursor(icon))
+
     def init_action(self):
-        self.act_opendir = QAction("&Open image dir", self, triggered=self.opendir)
-        self.act_open_annotations = QAction("Open &label file", self, triggered=self.open_annotations)
+        self.act_opendir = QAction("&Open Image Directory", self, triggered=self.opendir)
+        self.act_open_annotations = QAction("Open &Annotation File", self, triggered=self.open_annotations)
         # self.act_set_thumbnail_dir = QAction("Set the folder of icons", self, triggered=self.open_thumbnail_dir)
 
         self.act_save = QAction("&Save", self , shortcut="Ctrl+S", triggered=self.save_annotations)
@@ -164,10 +258,22 @@ class MainWindow(QMainWindow):
 
         self.act_undo = QAction("&Undo",self, shortcut="Ctrl+Z", triggered=self.undo)
 
-        self.act_browse_mode = QAction("view small images", self, shortcut="Ctrl+b", triggered=self.toggle_browse_mode, checkable=True)
-        self.act_point_mode = QAction("Pts", self, triggered=self.toggle_point_mode, checkable=True)
+        self.act_browse_mode = QAction("Review Mode", self, shortcut="Ctrl+b", triggered=self.toggle_browse_mode, checkable=True)
 
-        self.act_attention_imgs_only = QAction("Flag images only", self, triggered=self.toggle_flag_img, checkable=True)
+
+        # self.act_point_mode = QAction("Pts", self, triggered=self.toggle_point_mode, checkable=True)
+        # self.act_outline_mode = QAction("outline", self, triggered=self.toggle_seg_mode, checkable=True)
+
+        self.act_point_mode = QAction("Points", self,  checkable=True)
+        self.act_outline_mode = QAction("Segs", self, checkable=True)
+
+        self.act_group_modes = QActionGroup(self)
+
+        self.act_group_modes.addAction(QAction("View", self,  checkable=True, checked = True))
+        self.act_group_modes.addAction(self.act_point_mode)
+        self.act_group_modes.addAction(self.act_outline_mode)
+
+        self.act_attention_imgs_only = QAction("Show Flag Images", self, triggered=self.toggle_flag_img, checkable=True)
 
         self.act_delete_point = QAction("Delete point", self, triggered=self.delete_point)
 
@@ -175,6 +281,28 @@ class MainWindow(QMainWindow):
         self.act_sort_file_names = QAction("sort file", self, triggered = self.sort_file_names , checkable=True, enabled = False)
         self.act_sort_anno_names = QAction("sort annotations", self, triggered = self.sort_anno_names , checkable=True, enabled = False)
 
+        self.act_brush_object = QAction("Draw", self, checkable=True)
+        self.act_brush_erase = QAction("Erase", self, checkable=True)
+
+        self.act_brush_object.setChecked(True)
+
+        self.act_brush_0 = QAction("Size_0", self, checkable=True)
+        self.act_brush_1 = QAction("Size_1", self, checkable=True)
+        self.act_brush_2 = QAction("Size_2", self, checkable=True)
+        self.act_brush_3 = QAction("Size_3", self, checkable=True)
+
+        self.act_brush_1.setChecked(True)
+
+        self.act_group_brushes = QActionGroup(self)
+
+        self.act_group_brushes.addAction(self.act_brush_0)
+        self.act_group_brushes.addAction(self.act_brush_1)
+        self.act_group_brushes.addAction(self.act_brush_2)
+        self.act_group_brushes.addAction(self.act_brush_3)
+
+        self.act_group_brush_cate = QActionGroup(self)
+        self.act_group_brush_cate.addAction(self.act_brush_object)
+        self.act_group_brush_cate.addAction(self.act_brush_erase)
     def init_menu(self):
         # File part
         self.menu_file = QMenu("&File", self)
@@ -189,11 +317,11 @@ class MainWindow(QMainWindow):
 
         self.menuBar().addMenu(self.menu_file)
 
-        #Edit part
-        self.menu_edit = QMenu("&Edit", self)
-        self.menu_edit.addAction(self.act_undo)
-
-        self.menuBar().addMenu(self.menu_edit)
+        #Edit part, comment with the self.act_undo
+        # self.menu_edit = QMenu("&Edit", self)
+        # self.menu_edit.addAction(self.act_undo)
+        #
+        # self.menuBar().addMenu(self.menu_edit)
         #View part:
         self.menu_view = QMenu("&View", self)
         self.menu_view.addAction(self.act_browse_mode)
@@ -216,12 +344,22 @@ class MainWindow(QMainWindow):
 
         self.toolbar = self.addToolBar("Tool bars")
 
-        self.toolbar.addAction(self.act_point_mode)
+        self.toolbar.addActions(self.act_group_modes.actions())
         self.toolbar.addSeparator()
         self.toolbar.addAction(self.act_browse_mode)
         self.toolbar.addSeparator()
         self.toolbar.addAction(self.act_attention_imgs_only)
 
+        self.toolbar_outline =QToolBar("Outline")
+        self.toolbar_outline.addActions(self.act_group_brush_cate.actions())
+        self.toolbar_outline.addSeparator()
+        self.toolbar_outline.addActions(self.act_group_brushes.actions())
+
+
+
+        self.addToolBarBreak()
+
+        self.addToolBar(Qt.TopToolBarArea, self.toolbar_outline)
     def opendir(self, _value=False, dirpath=None):
 
 
@@ -234,12 +372,11 @@ class MainWindow(QMainWindow):
         if temp and temp != self.work_dir:
             self.work_dir = temp
             self.data.set_work_dir(temp)
-
             self.list_file_names()
-
+            self.list_review_assist()
             # self.widget_browser.reset_widget()
 
-        self.widget_folder_label.setText("Working Dir: {}".format(os.path.abspath(self.data.work_dir)))
+            self.widget_folder_label.setText("Image Dir: {}".format(os.path.abspath(self.data.work_dir)))
 
     def open_annotations(self):
         self.message_unsave()
@@ -253,15 +390,17 @@ class MainWindow(QMainWindow):
             self.data.set_changed(False)
 
             # self.widget_browser.reset_widget()
-
+        self.list_review_assist()
         self.list_file_names()
 
-    def open_thumbnail_dir(self):
-        print("set thumbnail dir")
 
     def undo(self):
-        # Undo action.
-        # self.data.get_current_pt_of_current_img().undo_set_point()
+        """
+        Undo action
+        Currently unable
+        :return:
+        """
+        return None
 
         self.data.undo_act()
 
@@ -269,25 +408,42 @@ class MainWindow(QMainWindow):
         # self.list_properties()
         self.widget_annotation.update()
     def save_annotations(self):
+        """
+        Action save file
+        :return:
+        """
 
         # Save the old version of file
-        json_name = os.path.basename(self.data.file_name)
-        json_dir = os.path.dirname(self.data.file_name)
-        time_now = datetime.datetime.now()
-        temp_dir = os.path.join( os.path.join(json_dir,'temp'), time_now.strftime("%Y-%m-%d_%H-%M-%S"))
+        # json_name = os.path.basename(self.data.file_name)
+        # json_dir = os.path.dirname(self.data.file_name)
+        # time_now = datetime.datetime.now()
+        # temp_dir = os.path.join( os.path.join(json_dir,'temp'), time_now.strftime("%Y-%m-%d_%H-%M-%S"))
+        #
+        # # Save a backup to temp dir
+        # if not self.data.no_anno_file:
+        #     if not os.path.exists(temp_dir):
+        #         os.makedirs(temp_dir)
+        #     temp_path = os.path.join(temp_dir,json_name)
+        #     copyfile(self.data.file_name,temp_path)
+        # else:
+        #     self.save_as()
+        #     self.data.no_anno_file = False
 
-        # Save a backup to temp dir
-        if not self.data.no_anno_file:
-            if not os.path.exists(temp_dir):
-                os.makedirs(temp_dir)
-            temp_path = os.path.join(temp_dir,json_name)
-            copyfile(self.data.file_name,temp_path)
+
+        if self.data.no_anno_file:
+            self.save_as()
+            self.data.no_anno_file = False
+
 
         # Save the new data into the same name
         self.data.write_json()
         # self.widget_anno_file_label.setText("Annotation file: {}".format(self.data.file_name))
 
     def save_as(self):
+        """
+        action save file as
+        :return:
+        """
 
         current_dir = self.data.work_dir
         save_path, _ = QFileDialog.getSaveFileName(self, 'Saving Annotations',current_dir,"JSON (*.json)")
@@ -316,42 +472,115 @@ class MainWindow(QMainWindow):
             for row in range(self.widget_file_list.count()):
                 if row not in flagged_img_idx:
                     self.widget_file_list.item(row).setHidden(True)
+                else:
+                    self.widget_file_list.item(row).setHidden(False)
         else:
             for row in range(self.widget_file_list.count()):
                 self.widget_file_list.item(row).setHidden(False)
 
+    def list_review_assist(self):
+        """
+        List specimen characteristics on Review assistant
+        The default is the Name,
+
+        """
+        self.widget_review_assist_combobox.clear()
+        # list in review properties
+        for key,item in self.data.img_props.items():
+            if item ==None:
+
+                self.widget_review_assist_combobox.addItem(key)
+            else:
+                props = sorted(list(set(item)))
+                widget_list = QListWidget()
+                widget_list.itemChanged.connect(self.widget_review_properties_item_click_filter)
+                for prop in props:
+                    item = QListWidgetItem()
+                    item.setText(prop)
+                    item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
+                    item.setCheckState(Qt.Checked)
+                    widget_list.addItem(item)
+
+                self.widget_review_tab.addTab(widget_list, key)
+
+    # To be removed
+    def list_review_assist_props(self, value):
+        """
+        List props of selected specimen characteristic
+
+        :param value:
+        :return:
+        """
+        self.widget_review_properties.clear()
+
+        if self.data.img_props[value] == None:
+            self.button_review_sort.setEnabled(True)
+        else:
+            self.button_review_sort.setEnabled(False)
+            # l = self.data.img_props[value]
+            props = sorted(list(set(self.data.img_props[value])))
+
+            for prop in props:
+                item = QListWidgetItem()
+                item.setText(prop)
+                item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
+                item.setCheckState(Qt.Checked)
+                self.widget_review_properties.addItem(item)
+
+    def widget_review_properties_item_click_filter(self, item):
+        """
+        Filter image list when properties are unchecked
+        """
+        filtered_dict = {}
+        for tab_text, widget in iter_all_tab_widgets(self.widget_review_tab):
+            prop_key = str(tab_text)
+            filtered_dict[prop_key] = []
+            for item in iter_all_list_items(widget):
+                if item.checkState():
+                    filtered_dict[prop_key].append(item.text())
+
+
+
+        flagged_img_idx = self.data.filter_imgs_by_review_assist(filtered_dict)
+
+        if self.act_attention_imgs_only.isChecked():
+            flagged_img_idx = list(set(flagged_img_idx) & set(self.data.flagged_img_idx))
+
+        self.filter_img(flagged_img_idx, True)
+
+        # for item in iter_all_list_items(self.widget_review_properties):
+        #     if item.checkState():
+        #         filtered_items.append(item.text())
+        #
+        # prop_key = str(self.widget_review_assist_combobox.currentText())
+        #
+        # flagged_img_idx = self.data.filter_imgs_by_review_assist( prop_key,  filtered_items)
+        #
+        # if self.act_attention_imgs_only.isChecked():
+        #     flagged_img_idx = list(set(flagged_img_idx) & set(self.data.flagged_img_idx))
+        #
+        # print(prop_key , filtered_items,  flagged_img_idx)
+        #
+        # self.filter_img(flagged_img_idx, True)
 
 
     def list_point_name(self):
         """
-        List names of points on the point name part
+        List names of points on the point panel
         :return:
         """
-        # self.widget_point_list.clear()
-        # points = self.data.get_current_image_points()
-        # if points is not None:
-        #     for pt in points:
-        #         self.widget_point_list.addItem(pt.pt_name)
-        #
-        #     cur_id = self.data.get_current_image().get_current_pt_id()
-        #     if cur_id is not None and cur_id<self.widget_point_list.count():
-        #         self.widget_point_list.setCurrentRow(cur_id)
-
 
         self.widget_point_list.clear()
         points = self.data.get_current_image_points()
-        print(points)
         if points is not None:
             keys = list(points.keys())
             if self.act_sort_anno_names.isChecked():
                 # sort annotaions
-                keys.sort()
-                for key in keys:
-                    self.widget_point_list.addItem(key)
 
-            else:
-                for key in keys:
-                    self.widget_point_list.addItem(key)
+                keys.sort()
+                print("sorted key in Mainwindow.list_point_name", keys)
+            for key in keys:
+                self.widget_point_list.addItem(key)
 
             cur_key = self.data.get_current_image().get_current_pt_key()
 
@@ -360,7 +589,59 @@ class MainWindow(QMainWindow):
                 idx = keys.index(cur_key)
                 self.widget_point_list.setCurrentRow(idx)
 
+    def list_seg_name(self):
+        """
+        List segmentations
+        Combining segmentation name and colour information into a dict
+
+        """
+        self.current_image_colour_map = {}
+
+
+        self.widget_segment_list.clear()
+        self.widget_segment_combobox.clear()
+
+        segments = self.data.get_current_image_segments_cv()
+        if segments is not None:
+            keys = list(segments.keys())
+            if self.act_sort_anno_names.isChecked():
+                # sort annotaions
+                keys.sort()
+
+            for idx, key in enumerate(keys):
+                item = QListWidgetItem()
+                item.setText(key)
+                item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
+
+                item.setCheckState(Qt.Unchecked)
+
+                icon = QPixmap(10,10)
+                icon.fill(self.seg_colours[idx])
+
+                self.current_image_colour_map[key] = self.seg_colours[idx]
+
+                item.setIcon(QIcon(icon))
+
+                self.widget_segment_list.addItem(item)
+
+                self.widget_segment_combobox.addItem(key)
+
+            self.set_seg_colour_and_cate()
+            # After list Set the seg colour and category to init.
+
+            # cur_key = self.data.get_current_image().get_current_pt_key()
+            #
+            # if cur_key is not None and cur_key in points:
+            #     keys = list(points.keys())
+            #     idx = keys.index(cur_key)
+            #     self.widget_point_list.setCurrentRow(idx)
+
     def list_properties(self):
+        """
+        List the currently selected label's properties
+
+        :return:
+        """
 
         # Use as locking prop_table_item_changed.
         self.prop_change_lock = True
@@ -387,24 +668,57 @@ class MainWindow(QMainWindow):
         if item is not None and self.prop_change_lock == False:
             # Depending on different row of input.
             value = item.text()
+
+            if value.lower() == 'true':
+                 value = True
+            elif value.lower() == 'false':
+                 value =  False
+
             row = self.widget_props_table.row(item)
             key = self.widget_props_table.verticalHeaderItem(row).text()
+
+            if key =='pt_name':
+                changed = self.data.check_new_name_in_current_point_dict(value)
+                if changed:
+                    self.list_point_name()
+                else:
+                    QMessageBox.about(self, "Failed", "Fail to edit the name\nname is duplicate.")
+
+
+
+
             pt_prop = {key: value}
+
+            ## check the name see if it is duplicated
             self.data.set_current_pt_of_current_img_dict(pt_prop)
+
+            self.list_properties()
+
+
+
+
+            # self.data.reset_current_img_point_dict()
 
 
     def file_list_current_item_changed(self,row):
-
+        """
+        The image changed
+        """
         if row !=-1:
             idx = row
 
             self.widget_file_list.setCurrentRow(idx)
             self.data.set_image_id(idx)
+
+            self.widget_annotation.reset_mask()
             self.widget_annotation.update()
+
 
             # # Set table:
             self.list_point_name()
             self.list_properties()
+
+            self.list_seg_name()
 
 
 
@@ -417,6 +731,20 @@ class MainWindow(QMainWindow):
             self.data.get_current_image().set_current_pt_key(key)
 
             self.list_properties()
+
+    def contour_combobox_activated(self, text):
+        """
+        Set the segmentation colour and the category saved in the datafile.
+
+        :param text:
+        :return:
+        """
+        # Init is the first
+
+        # self.widget_annotation.contour_colour = self.seg_colours[self.widget_segment_combobox.currentIndex()]
+
+        self.set_seg_colour_and_cate()
+
 
 
     def eventFilter(self, source, event):
@@ -457,15 +785,12 @@ class MainWindow(QMainWindow):
             self.widget_stack.setCurrentWidget(self.scroll_area)
             self.property_dock.setVisible(True)
 
-
-    def toggle_point_mode(self):
-
-        if self.act_point_mode.isChecked():
-            self.widget_annotation.state_place_pt = True
-        else:
-            self.widget_annotation.state_place_pt = False
-
     def toggle_flag_img(self):
+        """
+        Only show toggle images
+        :return:
+        """
+
         flag_mode = self.act_attention_imgs_only.isChecked()
         # Set the data into flag mode
         # By hiding the non-flag images
@@ -473,18 +798,24 @@ class MainWindow(QMainWindow):
         # Set hidden item to file list?
 
         # self.list_file_names()
+        print("toggle_flag_img" , flagged_img_idx)
+        self.filter_img( flagged_img_idx, flag_mode,)
 
-        self.hide_file_names(flag_mode,flagged_img_idx)
-        self.widget_browser.hide_icons(flag_mode,flagged_img_idx)
+        # self.hide_file_names(flag_mode,flagged_img_idx)
+        # self.widget_browser.hide_icons(flag_mode,flagged_img_idx)
+        #
+        #
+        # self.widget_file_list.setCurrentRow(self.data.current_image_id)
+        # self.widget_annotation.update()
 
+    def filter_img(self, img_idx, isfilter):
+
+        self.hide_file_names(isfilter,img_idx)
+        self.widget_browser.hide_icons(isfilter,img_idx)
 
 
         self.widget_file_list.setCurrentRow(self.data.current_image_id)
         self.widget_annotation.update()
-
-
-
-
     def delete_point(self):
         """
         Action after click delete point
@@ -492,6 +823,40 @@ class MainWindow(QMainWindow):
         """
         self.data.remove_pt_for_current_img(self.widget_point_list.currentItem().text())
         self.list_point_name()
+        self.list_properties()
+
+
+    def add_segmentation(self):
+        """
+        add the segmentation
+        :return:
+        """
+
+        name = self.widget_annotation.get_annotation_name('seg')
+
+        if name:
+            if self.data.add_seg_for_current_img(name):
+                print("added")
+            else:
+                QMessageBox.about(self, "Failed", "Fail to add the label\nname is duplicate.")
+
+
+
+        self.list_seg_name()
+
+    def delete_segmentaion(self):
+        """
+        Delete the segmentaion
+
+        :return:
+        """
+        print("delete seg:" , self.widget_segment_combobox.currentText())
+        self.data.remove_seg_for_current_img(self.widget_segment_combobox.currentText())
+
+        self.list_seg_name()
+
+
+
 
     def message_unsave(self):
         """
@@ -519,7 +884,7 @@ class MainWindow(QMainWindow):
 
     def menu_point_list(self,position):
         """
-        Context menu for point list.
+        Context menu (right click on the point panel) for point list.
         :param position:
         :return:
         """
@@ -576,6 +941,46 @@ class MainWindow(QMainWindow):
         # self.data.set_sort_points(self.act_sort_anno_names.isChecked())
 
         self.list_point_name()
+
+    def update_segment_drawing(self):
+        """
+        Update segmentation on the image.
+        Paint ticked segmentation
+
+        event: clicking the segmentation panel
+
+        :return:
+        """
+        self.widget_annotation.reset_mask()
+        items = []
+        colors = []
+        for i_item in range(self.widget_segment_list.count()):
+            item = self.widget_segment_list.item(i_item)
+            # Draw the certain mask
+
+
+            if item.checkState() == 2:
+                items.append(item)
+                colors.append(self.seg_colours[i_item])
+
+        self.widget_annotation.draw_init_mask(items, colors)
+
+        self.widget_annotation.update()
+
+
+    def set_seg_colour_and_cate(self):
+        """
+        Set the name of the segmentation
+        Set the colour of the segmentation
+
+        :return:
+        """
+        self.widget_annotation.contour_colour = self.seg_colours[self.widget_segment_combobox.currentIndex()]
+
+
+        self.widget_annotation.contour_name = self.widget_segment_combobox.currentText()
+
+
 
 
 if __name__ == '__main__':
