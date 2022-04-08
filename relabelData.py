@@ -9,13 +9,16 @@ import json
 from math import ceil
 import copy
 import numpy as np
+import pandas as pd
 import cv2
+
+from util import phenolearn_io
+
 pixmap_max_size_limit = QSize(1300,700)
 pixmap_min_size_limit = QSize(400,200)
 
 rect_length_prop = 0.015
 min_rect_length = 20
-
 
 def convert(o):
     if isinstance(o, np.int64): return int(o)
@@ -337,6 +340,7 @@ class Data():
             self.file_name = file_name
             self.no_anno_file = False
         self.changed = False
+
         # Sorting part
         self.sort_points = False
         self.images_origin = None
@@ -347,6 +351,8 @@ class Data():
 
     def init_images(self):
         self.images = []
+        self.images = {}
+
         self.pt_names = set()
         self.seg_names = set()
         self.img_props = {}
@@ -354,16 +360,18 @@ class Data():
 
 
         if self.work_dir is not None:
-            # Get list of images
+            # Get list of images in the image dir
             extensions = ['.%s' % fmt.data().decode("ascii").lower() for fmt in QImageReader.supportedImageFormats()]
             work_dir_file_names = [os.path.basename(file_name) for file_name in Path(self.work_dir).glob('*')  if str(file_name).lower().endswith(tuple(extensions))]
 
             if not self.no_anno_file:
             # Has annotation file
-                with open(self.file_name, "r") as read_file:
-                    data = json.load(read_file)
+
+                # with open(self.file_name, "r") as read_file:
+                #     data = json.load(read_file)
+
                 # Init images list
-                for entry in data:
+                for entry in self.data:
                     if entry['file_name'] in work_dir_file_names:
                         image = Image(entry['file_name'] ,
                                        entry.get('points', None),
@@ -371,56 +379,58 @@ class Data():
                                       entry.get("outlines_cv" , None),
                                       entry.get("property", None)
                                       )
-                        self.images.append(image)
+                        #self.images.append(image)
+
+                        self.images[entry['file_name']] = image
                         # Update points names of all
                         for pt in entry['points']:
                             self.pt_names.add(pt['name'])
-
                         #Update seg name for all seg
-                        for key,_ in entry['outlines_cv'].items():
+                        for key,_ in entry.get("outlines_cv", {}).items():
                             self.seg_names.add(key)
 
                         #Update outline names
-                        for key,item in entry['property'].items():
+                        for key,item in entry.get("property", {}).items():
 
-                            if type(item) is str:
-                                # Categorical
-                                if key in self.img_props:
-                                    self.img_props[key].append(item)
-                                else:
-                                    self.img_props[key] = [item]
+                            if key in self.img_props:
+                                self.img_props[key].append(item)
                             else:
-                                # Numerical
-                                if key not in self.img_props:
-                                    self.img_props[key] = None
-
-
-
+                                self.img_props[key] = [item]
 
             else:
             # without annotation file
                 for name in work_dir_file_names:
                     image = Image(name)
-                    self.images.append(image)
+                    # self.images.append(image)
+                    self.images[name] = image
 
-
-            self.current_image_id = 0
             self.img_size = len(self.images)
             if self.img_size !=0:
+                self.current_image_id = list(self.images.keys())[0]
                 self.current_pixmap = QPixmap(os.path.join(self.work_dir,self.get_current_image_name()))
                 self.set_scale_fit_limit()
 
-            self.filter_idx = list(range(0,self.img_size))
-            self.sort_idx = list(range(0,self.img_size))
-            self.flagged_img_idx= []
 
+            self.filter_idx = list(range(0,self.img_size))
+            self.flagged_img_idx= []
+            self.filtered_img_idx = list(self.images.keys())
+
+            self.img_id_order = list(self.images.keys())
 
     def sort(self, value):
         if value == True:
-            self.images_origin = self.images.copy()
-            self.images.sort(key = lambda x:x.img_name, reverse = False)
-        elif self.images_origin is not None:
-            self.images = self.images_origin
+            self.img_id_order=sorted(self.img_id_order,reverse=True)
+
+        #     self.images_origin = self.images.copy()
+        #     self.images.sort(key = lambda x:x.img_name, reverse = False)
+        # elif self.images_origin is not None:
+        #     self.images = self.images_origin
+        else:
+            self.img_id_order = list(self.images.keys())
+
+    def sort_by_value(self,value):
+
+        self.img_id_order = [x for _,x in sorted(zip(self.img_props[value],list(self.images.keys())))]
 
 
     def set_image_id(self, idx):
@@ -436,8 +446,27 @@ class Data():
         self.init_images()
 
     def set_file_name(self,file_name):
+        """csv or json"""
+
         self.no_anno_file = False
         self.file_name = file_name
+
+        with open(self.file_name, "r") as read_file:
+            self.data = json.load(read_file)
+
+        self.init_images()
+
+
+    def set_file_name_csv(self,file_name, id_col , coord_cols, outline_cols, prop_cols ):
+        """csv or json"""
+
+        self.no_anno_file = False
+        self.file_name = file_name[:-3] + ".json"
+
+        df = pd.read_csv(file_name)
+
+        self.data = phenolearn_io.transfer_df_to_json_by_cols(df,id_col, coord_cols, outline_cols, prop_cols)
+
         self.init_images()
 
     def set_scale(self,scale):
@@ -553,7 +582,7 @@ class Data():
 
 
 
-    # Deprecated
+    # To be removed
     def trans_current_segment_to_contour(self, segment, segment_name):
         #turn canvas into images
         image = segment.toImage()
@@ -574,7 +603,7 @@ class Data():
         print(np.sum(arr[:,:,:3] == np.array([220,20,60])))
         _,thresh = cv2.threshold(mask,2,255,0)
 
-        _, contours, hierarchy = cv2.findContours(thresh,cv2.RETR_TREE,cv2.CHAIN_APPROX_SIMPLE)
+        contours, hierarchy = cv2.findContours(thresh,cv2.RETR_TREE,cv2.CHAIN_APPROX_SIMPLE)
         # cv2.drawContours(arr, contours, -1, (0,255,0), 3)
         # cv2.imwrite(os.path.join("mat_test/contour" , "contour.jpg") , arr)
 
@@ -605,6 +634,21 @@ class Data():
 
         segments[segment_name].set_segment(segment.segment_name, new_contours, hierarchy=None ,
                             error = segment.error , info = segment.info , absence=segment.absence)
+    def get_current_image_segments(self):
+
+        if self.images:
+            return self.images[self.current_image_id].segments
+        else:
+            return None
+
+    def get_current_image_scaled_segments(self):
+        outlines = self.get_current_image_segments()
+
+        if outlines:
+            return {key : outline * self.scale for key, outline in outlines.items()}
+        else:
+            return None
+    # end #
 
     def trans_current_segment_to_contour_cv(self, segment, segment_name, contour_colour):
         """
@@ -628,9 +672,6 @@ class Data():
         img_mask = arr[:,:,:3] != cv_colour[:3]
         mask_final = np.logical_and(img_mask[...,0], img_mask[...,1],img_mask[...,2])
         arr[mask_final,3] =0
-
-
-
         mask = arr[:,:,3]
 
         _,thresh = cv2.threshold(mask,2,255,0)
@@ -641,12 +682,49 @@ class Data():
 
         thresh = cv2.resize(thresh,(width , height))
 
-        _, contours, hierarchy = cv2.findContours(thresh,cv2.RETR_TREE,cv2.CHAIN_APPROX_SIMPLE)
+        contours, hierarchy = cv2.findContours(thresh,cv2.RETR_TREE,cv2.CHAIN_APPROX_SIMPLE)
 
 
         contours = [contour.tolist() for contour in contours]
         self.get_current_image_segments_cv()[segment_name]['contours'] = contours
 
+    def close_current_segment(self, segment, segment_name, contour_colour):
+        """
+        Convert the segmentaion from images to
+        :param canvas:
+        :param contour_name:
+        :return:
+        """
+        # Get the mask of current segmentation
+        image = segment.toImage()
+        image = image.convertToFormat(QImage.Format_RGBA8888)
+        s = image.bits().asstring(image.width()*image.height() * 4)
+        arr = np.fromstring(s, dtype=np.uint8).reshape((image.height(),image.width() ,4))
+        cv_colour = (contour_colour.red() , contour_colour.green() , contour_colour.blue() ,contour_colour.alpha())
+        img_mask = arr[:,:,:3] != cv_colour[:3]
+        mask_final = np.logical_and(img_mask[...,0], img_mask[...,1],img_mask[...,2])
+        arr[mask_final,3] =0
+        mask = arr[:,:,3]
+
+        _,thresh = cv2.threshold(mask,2,255,0)
+        height = self.get_current_origin_pixmap().height()
+        width = self.get_current_origin_pixmap().width()
+
+        thresh = cv2.resize(thresh,(width , height))
+
+        contours, hierarchy = cv2.findContours(thresh,cv2.RETR_TREE,cv2.CHAIN_APPROX_SIMPLE)
+
+
+        mask_empty=np.zeros((height, width ,1)).astype('uint8')
+
+        for contour in contours:
+            cv2.fillPoly(mask_empty, [contour], 255)
+
+        contours, hierarchy = cv2.findContours(mask_empty,cv2.RETR_TREE,cv2.CHAIN_APPROX_SIMPLE)
+
+
+        contours = [contour.tolist() for contour in contours]
+        self.get_current_image_segments_cv()[segment_name]['contours'] = contours
 
     def remove_pt_for_current_img(self, key = None):
         """
@@ -692,6 +770,16 @@ class Data():
         else:
             return None
 
+    def get_numerical_id_of_current_image_id(self):
+
+        return np.where(np.array(self.img_id_order)==self.current_image_id)[0][0]
+
+    def numerical_id_to_image_id(self, numerical_id):
+        return list(self.images.keys())[numerical_id]
+
+    def image_id_to_numerical_id(self, current_image_id):
+        return np.where(np.array(list(self.images.keys()))==current_image_id)[0][0]
+
     def get_current_image_points(self):
         # if self.images:
         #     return self.images[self.current_image_id].points
@@ -703,20 +791,7 @@ class Data():
         else:
             return None
 
-    def get_current_image_segments(self):
 
-        if self.images:
-            return self.images[self.current_image_id].segments
-        else:
-            return None
-
-    def get_current_image_scaled_segments(self):
-        outlines = self.get_current_image_segments()
-
-        if outlines:
-            return {key : outline * self.scale for key, outline in outlines.items()}
-        else:
-            return None
 
 
     def get_current_image_segments_cv(self):
@@ -772,46 +847,89 @@ class Data():
         """
 
         if state == True:
-            self.flagged_img_idx =  [idx for idx, img in enumerate(self.images) if img.attention_flag == True]
+            self.flagged_img_idx =  [key for key, img in self.images.items() if img.attention_flag == True]
 
-            self.flagged_img_idx = list(set(self.filter_idx) & set(self.flagged_img_idx))
+            # self.flagged_img_idx = list(set(self.filter_idx) & set(self.flagged_img_idx))
 
-            if self.flagged_img_idx:
-                self.current_image_id = self.flagged_img_idx[0]
+            # np_img_id = np.array(list(self.images.keys()))
 
-        else:
-            self.current_image_id = 0
-            # self.images = self.images_backup
-            # self.images_backup = None
+            # self.flagged_img_idx = np_img_id[self.flagged_img_idx]
+            self.flagged_img_idx = list(set(self.filtered_img_idx) & set(self.flagged_img_idx))
 
-        # if self.current_image_id >= len(self.images):
-        #     self.current_image_id =len(self.images)-1
+        #     if self.flagged_img_idx:
+        #         self.current_image_id = self.flagged_img_idx[0]
+        #
+        # else:
+        #     self.current_image_id = 0
+
         return self.flagged_img_idx
+
+    # def filter_imgs_by_review_assist(self, filtered_dict):
+    #     """
+    #     Change the current image into first flagged image
+    #     Intersect ( flag idx, self.filter_idx)
+    #
+    #     :return: indices of ticked images.
+    #     """
+    #     all_idx = list(range(0,self.img_size))
+    #     for prop_key, filtered_items in filtered_dict.items():
+    #         filter_idx = list(np.where(np.isin(self.img_props[prop_key], filtered_items)==True)[0])
+    #         all_idx = list(set(all_idx) & set(filter_idx))
+    #     print("all idx",all_idx)
+    #     self.filter_idx = all_idx
+    #     # self.filter_idx = list(set(self.filter_idx) & set(self.flagged_img_idx))
+    #
+    #
+    #     if self.filter_idx:
+    #         self.current_image_id = self.numerical_id_to_image_id(self.filter_idx[0])
+    #     return self.filter_idx
 
     def filter_imgs_by_review_assist(self, filtered_dict):
         """
         Change the current image into first flagged image
         Intersect ( flag idx, self.filter_idx)
 
-        :return: indices of ticked images.
+        :return: list of names of filtered images
         """
         all_idx = list(range(0,self.img_size))
         for prop_key, filtered_items in filtered_dict.items():
             filter_idx = list(np.where(np.isin(self.img_props[prop_key], filtered_items)==True)[0])
             all_idx = list(set(all_idx) & set(filter_idx))
-        print("all idx",all_idx)
-        self.filter_idx = all_idx
-        # self.filter_idx = list(set(self.filter_idx) & set(self.flagged_img_idx))
 
+        np_img_id = np.array(list(self.images.keys()))
 
-        if self.filter_idx:
-            self.current_image_id = self.filter_idx[0]
-        return self.filter_idx
+        self.filtered_img_idx = list(np_img_id[all_idx])
+        # if self.filtered_img_idx:
+        #     self.current_image_id = self.filtered_img_idx[0]
+
+        return self.filtered_img_idx
+
 
     def write_json(self, save_name = None):
         # Create data form to save
+
+        image_list = self.get_json()
+
+        if save_name is None:
+            save_name = self.file_name
+
+        with open(save_name, 'w') as write:
+            json.dump(image_list, write , default=convert)
+
+        self.changed = False
+
+
+    def write_csv(self, save_name):
+        # Create data form to save
+
+        image_list = self.get_json()
+        df = phenolearn_io.transfer_json_to_df_by_cols(image_list, coord_cols =None, outline_cols=None, prop_cols=None)
+        df.to_csv(save_name , index=None)
+
+    def get_json(self):
+        # Create data form to save
         image_list = []
-        for image in self.images:
+        for key, image in self.images.items():
             entry = {'file_name': image.img_name}
             # points list
             points = []
@@ -824,25 +942,11 @@ class Data():
 
             entry['outlines_cv'] = image.segments_cv
 
-            # Use the segmentation cv instead
-
-            # segments = []
-            # for key, seg in image.segments.items():
-            # #     contour_data =
-            #     seg_data = {"name": seg.segment_name, "contours": seg.contours}
-            #     segments.append(seg_data)
-            # entry['outlines'] = segments
+            entry['property'] = image.property
 
             image_list.append(entry)
 
-        if save_name is None:
-            save_name = self.file_name
-
-        with open(save_name, 'w') as write:
-            json.dump(image_list, write , default=convert)
-
-        self.changed = False
-
+        return image_list
 
 class Data_gui(Data, QObject):
     # Date object for relabel app
@@ -890,10 +994,18 @@ class Data_gui(Data, QObject):
         return changed
 
 
+    def trans_current_segment_to_contour_cv(self, segment, segment_name, contour_colour):
+        super().trans_current_segment_to_contour_cv( segment, segment_name, contour_colour)
+
+        self.set_current_img_changed(True)
+
+
     def write_json(self, save_name = None):
         super().write_json(save_name)
 
         self.value_change(False)
+
+
 
     def set_current_pt_of_current_img(self, pt_name = None,x= None,y=None, error = None, absence = None,info = None,
                                       scaled_coords= False ):

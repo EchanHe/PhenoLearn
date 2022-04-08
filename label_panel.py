@@ -15,6 +15,10 @@ import cv2
 
 
 class LabelPanel(QWidget):
+    """The annotation or label panel
+    
+    Use QPixmap as the canvas
+    """
 
     def __init__(self,  data = None):
         super().__init__()
@@ -23,6 +27,11 @@ class LabelPanel(QWidget):
 
 
     def initUI(self, data ):
+        """init the class
+
+        Args:
+            data (_type_): The relabelData
+        """
 
         self.state_moving = False
 
@@ -47,6 +56,7 @@ class LabelPanel(QWidget):
         self.scale = 1
         self.offset = QPointF(0, 0)
 
+
         self.canvas = QPixmap(self.rect().width() , self.rect().height())
         color = QColor(0, 0, 0, 0)
         self.canvas.fill(color)
@@ -64,6 +74,14 @@ class LabelPanel(QWidget):
 
         self.contour_colour = None
         self.contour_name = None
+
+
+        self.has_no_hidden = False
+
+    def clear_panel(self):
+        self.canvas = QPixmap(self.rect().width() , self.rect().height())
+        color = QColor(0, 0, 0, 0)
+        self.canvas.fill(color)
 
     def init_for_testing(self):
         # Used for testing the widget itself.
@@ -151,7 +169,7 @@ class LabelPanel(QWidget):
             # Draw contour
 
 
-            if self.state_place_outline:
+            if self.state_place_outline and (self.contour_colour is not None) and (self.contour_name is not None):
                 self.draw_on_mask(pos.x(), pos.y(), brush_size=self.get_brush_width(), seg = self.get_brush_cate())
                 self.state_drawing_contour = True
                 # p.drawPixmap(0,0, self.pixmap)
@@ -185,7 +203,7 @@ class LabelPanel(QWidget):
             self.close_state_moving()
 
             # For segmentataion
-            if self.state_place_outline:
+            if self.state_place_outline and (self.contour_colour is not None) and (self.contour_name is not None):
                 self.state_drawing_contour = False
 
                 # # Update contour in relabel data
@@ -247,7 +265,7 @@ class LabelPanel(QWidget):
         painter = QPainter(self)
 
         # Draw image part
-        if self.data.has_images():
+        if self.data.has_images() and self.has_no_hidden:
             self.draw_image(painter)
 
             # Draw annotations:
@@ -518,7 +536,18 @@ class LabelPanel(QWidget):
 
 
     def add_pt(self, pos):
-        name = self.get_annotation_name(mode='pt')
+        if self.parent() and \
+                self.parent().window().act_quick_label_mode.isChecked():
+            cur_pt_num = len(self.data.get_current_image_points())
+            quick_pt_num = len(self.parent().window().current_quick_points)
+            if cur_pt_num< quick_pt_num:
+                name = self.parent().window().current_quick_points[cur_pt_num]
+            else:
+                QMessageBox.about(self, "Warning", "You are adding more points than in the quick label mode.")
+                name = self.get_annotation_name(mode='pt')
+        else:
+            name = self.get_annotation_name(mode='pt')
+
         if name:
             if name is None or name =='':
                 QMessageBox.about(self, "Failed", "Fail to add the label\nname is empty.")
