@@ -61,7 +61,7 @@ class LabelPanel(QWidget):
         color = QColor(0, 0, 0, 0)
         self.canvas.fill(color)
 
-        ## The numpy format of the segmentataion
+        ## The numpy format of the segmentation
         # self.segmentation
 
 
@@ -137,6 +137,11 @@ class LabelPanel(QWidget):
 
 
     def mousePressEvent(self, e):
+        """_summary_
+
+        Args:
+            e (_type_): _description_
+        """
         # pos = self.coords_tranform_widget_to_image(e.pos())
 
         # update the annotation mode
@@ -146,7 +151,7 @@ class LabelPanel(QWidget):
 
         if e.button() == Qt.LeftButton:
             mouse_in_pt = False
-            # if it is on the a currrent point
+            # if it is on the a current point
             if self.state_place_pt :
                 points = self.data.get_current_scaled_points()
                 if points:
@@ -167,8 +172,6 @@ class LabelPanel(QWidget):
 
 
             # Draw contour
-
-
             if self.state_place_outline and (self.contour_colour is not None) and (self.contour_name is not None):
                 self.draw_on_mask(pos.x(), pos.y(), brush_size=self.get_brush_width(), seg = self.get_brush_cate())
                 self.state_drawing_contour = True
@@ -179,9 +182,9 @@ class LabelPanel(QWidget):
 
             # self.data.set_current_outline_of_current_img(pos.x(),pos.y(), 10)
 
-            # oultine contour part.
+            # outline contour part.
             #mouse_in_contour = False
-            # if it is on the a currrent point
+            # if it is on the a current point
             # outlines = self.data.get_current_image_scaled_outlines()
 
 
@@ -196,13 +199,13 @@ class LabelPanel(QWidget):
 
         pos = e.pos() #self.coords_tranform_widget_to_image(e.pos())
         if e.button() == Qt.LeftButton:
-            # if it is on the a currrent point
+            # if it is on the a current point
             if self.state_moving:
                 self.data.cache_for_dragging(begin =False)
 
             self.close_state_moving()
 
-            # For segmentataion
+            # For segmentation
             if self.state_place_outline and (self.contour_colour is not None) and (self.contour_name is not None):
                 self.state_drawing_contour = False
 
@@ -261,6 +264,12 @@ class LabelPanel(QWidget):
 
 
     def paintEvent(self, e):
+        """Paint the canvas
+
+        Args:
+            e (QPaintEvent): event
+        """
+
 
         painter = QPainter(self)
 
@@ -274,6 +283,8 @@ class LabelPanel(QWidget):
             painter.setPen(pen)
             painter.setBrush(brush)
 
+
+           
             #### Drawing points ####
 
             # From the scale point , draw points
@@ -323,13 +334,18 @@ class LabelPanel(QWidget):
 
 
     def draw_point(self,painter, bbox):
+        """Draw points on the canvas
+        Args:
+            painter (QPainter): QPainter
+            bbox (_type_): The bounding box (scaled) of th current point
+        """
         # painter.drawEllipse(bbox.center(), TEMP_SHAPE_LENGTH/2 * 1/self.scale, TEMP_SHAPE_LENGTH/2 * 1/self.scale)
         painter.drawEllipse(bbox.center(), bbox.width()//2, bbox.height()//2)
+        # painter.drawText(bbox.center(), "asdf")
 
 
     def draw_polygons(self,painter, contours , colour = QColor(0, 255, 255, 200)):
-        """
-        Draw the polgyon from inside to outside (Hierarchy high to low).
+        """Draw the polgyon from inside to outside (Hierarchy high to low).
 
         :param painter: Qpainter
         :param contours: Contours {"id": {'coords':[] , "level": , "child" :}}
@@ -516,14 +532,20 @@ class LabelPanel(QWidget):
             self.update_in_parent()
 
     def zoom_in(self):
+        """zoom in the image
+        """
         self.data.set_scale(1.25)
         self.update()
 
     def zoom_out(self):
+        """zoom out the image
+        """
         self.data.set_scale(0.8)
         self.update()
 
     def origin(self):
+        """set to the original scale
+        """
         self.data.reset_scale()
         self.update()
 
@@ -536,6 +558,11 @@ class LabelPanel(QWidget):
 
 
     def add_pt(self, pos):
+        """add a point to self.data
+
+        Args:
+            pos (_type_): position of the point
+        """
         if self.parent() and \
                 self.parent().window().act_quick_label_mode.isChecked():
             cur_pt_num = len(self.data.get_current_image_points())
@@ -547,7 +574,7 @@ class LabelPanel(QWidget):
                 name = self.get_annotation_name(mode='pt')
         else:
             name = self.get_annotation_name(mode='pt')
-
+        print(self.data.get_current_image())
         if name:
             if name is None or name =='':
                 QMessageBox.about(self, "Failed", "Fail to add the label\nname is empty.")

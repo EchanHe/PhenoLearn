@@ -12,7 +12,10 @@ import numpy as np
 item_size = QSize(350,350)
 icon_size = QSize(300,300)
 thumbnail_size = QSize(300,300)
-point_size = QSize(2,2)
+point_size = QSize(4,4)
+font_info = QFont('Arial', 12)
+font_size_scale= 2
+
 class BrowsePanel(QWidget):
     """The review panel class
 
@@ -59,6 +62,9 @@ class BrowsePanel(QWidget):
 
 
         self.painter = QPainter()
+        ## set the size of font
+        
+  
         self.painter.setCompositionMode(QPainter.CompositionMode_Source)
 
         self.layout.addWidget(self.widget_image_browser)
@@ -158,12 +164,11 @@ class BrowsePanel(QWidget):
                 pixmap = self.thumbnail_list[img_id].copy()
                 self.data.images[img_name_id].label_changed = False
 
-            self.painter.begin(pixmap)
-            self.draw_points_args(points_dict)
-
-            self.painter.drawPixmap(0,0,self.draw_seg_args(segments_cv))
-
-            self.painter.end()
+            
+                self.painter.begin(pixmap)
+                self.draw_points_with_painter(self.painter,points_dict)
+                self.painter.drawPixmap(0,0,self.draw_seg_args(segments_cv))
+                self.painter.end()
 
             pixmap = pixmap.scaled(icon_size, aspectRatioMode=Qt.KeepAspectRatio)
             icon = QIcon()
@@ -203,38 +208,67 @@ class BrowsePanel(QWidget):
                     pixmap = self.thumbnail_list[img_id].copy()
                     self.data.images[img_name_id].label_changed = False
 
-                self.painter.begin(pixmap)
-                self.draw_points_args(points_dict)
+                print("browser panel: " + img_name_id)
+                print(img_id)
+                print(points_dict)
+                # self.painter.begin(pixmap)
+                # self.draw_points_args(points_dict)
 
+                # self.painter.drawPixmap(0,0,self.draw_seg_args(segments_cv))
+
+                # self.painter.end()
+                
+                # painter = QPainter()
+                
+                
+                # painter.setCompositionMode(QPainter.CompositionMode_Source)
+                # painter_font = painter.font()
+                # painter_font.setPointSize(painter_font.pointSize() * font_size_scale)
+                # painter.setFont(painter_font)  
+                
+                self.painter.begin(pixmap)
+                self.draw_points_with_painter(self.painter,points_dict)
                 self.painter.drawPixmap(0,0,self.draw_seg_args(segments_cv))
 
                 self.painter.end()
-
+                
                 pixmap = pixmap.scaled(icon_size, aspectRatioMode=Qt.KeepAspectRatio)
                 icon = QIcon()
                 icon.addPixmap(pixmap, QIcon.Normal, QIcon.Off)
                 self.widget_image_browser.item(img_id).setIcon(icon)
 
-    def draw_points_args(self ,points_dict):
-        """Draw keypoint based on the scale (original reso / thumbnail reso)
 
-        Args:
-            points_dict (_type_): A dictionary of points detail
-        """        
+    def draw_points_with_painter(self , painter,points_dict):
+            """Draw keypoint based on the scale (original reso / thumbnail reso)
+
+            Args:
+                points_dict (_type_): A dictionary of points detail
+            """        
 
 
-        scale = max(self.data.current_pixmap.width()/thumbnail_size.width(), self.data.current_pixmap.height()/thumbnail_size.height())
+            scale = max(self.data.current_pixmap.width()/thumbnail_size.width(), self.data.current_pixmap.height()/thumbnail_size.height())
 
-        pen = QPen(Qt.red, 2)
-        brush = QBrush(QColor(0, 255, 255, 120))
-        self.painter.setPen(pen)
-        self.painter.setBrush(brush)
+            pen = QPen(Qt.red, 2)
+            brush = QBrush(QColor(0, 255, 255, 120))
+            painter.setPen(pen)
+            painter.setBrush(brush)
+            
+            painter.setFont(font_info)
+            font_size = QFontMetrics(font_info)
+            
+            
+            if points_dict:
+                for key, pt in points_dict.items():
+                    if not pt.absence:
+                        bbox = pt.rect
+                        painter.drawEllipse(bbox.center()/(scale), point_size.width(), point_size.height())
+                        
+                        #get the point name
+                        print(pt.pt_name," pixel length ", font_size.width(pt.pt_name))
+                        painter.drawText(bbox.center().x()/(scale) - font_size.width(pt.pt_name)/2,
+                                         bbox.center().y()/(scale) - font_size.height()/2,
+                                         pt.pt_name)
 
-        if points_dict:
-            for key, pt in points_dict.items():
-                if not pt.absence:
-                    bbox = pt.rect
-                    self.painter.drawEllipse(bbox.center()/(scale), point_size.width(), point_size.height())
 
     def draw_seg_args(self, segments_cv):
         """Draw segmentation based on the scale (original reso / thumbnail reso)
@@ -348,42 +382,31 @@ class BrowsePanel(QWidget):
         
             #### non-multi threads add images for testing  #####
            
-            # for image, img_id in zip(img_list , img_id_list):
-            #     points_dict = image.points_dict
-            #     segments_cv = image.segments_cv
+            for image, img_id in zip(img_list , img_id_list):
+                points_dict = image.points_dict
+                segments_cv = image.segments_cv
 
-            #     if self.widget_image_browser.item(img_id).icon().isNull():
-            #     # If the icon is NUll, read images
+                if self.widget_image_browser.item(img_id).icon().isNull():
+                # If the icon is NUll, read images
 
-            #     # read images and draw annotation
-            #     # Read images
-            #         pixmap = QPixmap(os.path.join(self.data.work_dir, image.img_name))
-            #         pixmap = pixmap.scaled(thumbnail_size, aspectRatioMode=Qt.KeepAspectRatio)
-            #     else:
-            #         pixmap = None
+                # read images and draw annotation
+                # Read images
+                    pixmap = QPixmap(os.path.join(self.data.work_dir, image.img_name))
+                    pixmap = pixmap.scaled(thumbnail_size, aspectRatioMode=Qt.KeepAspectRatio)
+                else:
+                    pixmap = None
 
-            #     self.add_image([img_id, pixmap , points_dict, segments_cv])
+                self.add_image([img_id, pixmap , points_dict, segments_cv])
 
             
             #### multi threads version of adding images ######
             
-            self.worker = Worker_read_thumbnail(self.add_image_QRunnable, img_list=img_list ,
-                                                img_id_list=img_id_list)
-            self.threadpool.start(self.worker)
+            # self.worker = Worker_read_thumbnail(self.add_image_QRunnable, img_list=img_list ,
+            #                                     img_id_list=img_id_list)
+            # self.threadpool.start(self.worker)
 
 
-            # self.read_thread_1.terminate()
-            # #
-            # self.read_thread_1.update_img_list(img_list[:len(img_list)//2], img_id_list[:len(img_list)//2] , self.widget_image_browser)
-            # # self.read_thread_1.quit()
-            # self.read_thread_1.start()
-            # #
-            # #
-            # self.read_thread_2.terminate()
-            #
-            # self.read_thread_2.update_img_list(img_list[len(img_list)//2:], img_id_list[len(img_list)//2:] , self.widget_image_browser)
-            # self.read_thread_2.quit()
-            # self.read_thread_2.start()
+            
 
 
 
@@ -419,6 +442,29 @@ class BrowsePanel(QWidget):
 
             self.parent().window().act_browse_mode.activate(QAction.Trigger)
 
+
+    ## functions that are not using now ####
+    def draw_points_args(self ,points_dict):
+        """Draw keypoint based on the scale (original reso / thumbnail reso)
+
+        Args:
+            points_dict (_type_): A dictionary of points detail
+        """        
+
+
+        scale = max(self.data.current_pixmap.width()/thumbnail_size.width(), self.data.current_pixmap.height()/thumbnail_size.height())
+
+        pen = QPen(Qt.red, 2)
+        brush = QBrush(QColor(0, 255, 255, 120))
+        self.painter.setPen(pen)
+        self.painter.setBrush(brush)
+
+        if points_dict:
+            for key, pt in points_dict.items():
+                if not pt.absence:
+                    bbox = pt.rect
+                    self.painter.drawEllipse(bbox.center()/(scale), point_size.width(), point_size.height())
+                    self.painter.drawText(bbox.center()/(scale), pt.pt_name)
 
 class Worker_read_thumbnail(QRunnable):
     """Class used to draw thumbnail images for review mode.

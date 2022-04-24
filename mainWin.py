@@ -768,9 +768,9 @@ class MainWindow(QMainWindow):
             self.list_file_names()
 
     def list_point_name(self):
-        """
-        List names of points on the point panel
-        :return:
+        """List names of points on the point panel
+        
+        Called when selected image changed, point added or deleted
         """
 
         self.widget_point_list.clear()
@@ -778,7 +778,7 @@ class MainWindow(QMainWindow):
         if points is not None:
             keys = list(points.keys())
             if self.act_sort_anno_names.isChecked():
-                # sort annotaions
+                # sort annotations
 
                 keys.sort()
                 print("sorted key in Mainwindow.list_point_name", keys)
@@ -793,9 +793,10 @@ class MainWindow(QMainWindow):
                 self.widget_point_list.setCurrentRow(idx)
 
     def list_seg_name(self):
-        """
-        List segmentations
+        """List segmentations to the seg list widget in the annotation panel
         Combining segmentation name and colour information into a dict
+        
+        Called when selected image changed, seg added or deleted
 
         """
         self.current_image_colour_map = {}
@@ -895,9 +896,8 @@ class MainWindow(QMainWindow):
 
 
     def file_list_current_item_changed(self,row):
-        """
-        The image changed.
-        auto add segmentation classes if quick label mode is enabled
+        """Detect whether the current image in the file list changed.
+        Auto add segmentation classes if quick label mode is enabled
         """
         if row !=-1:
             idx = row
@@ -1137,7 +1137,6 @@ class MainWindow(QMainWindow):
 
     def add_segmentation(self):
         """add the segmentation
-        :return:
         """
         if self.widget_file_list.currentRow()>=0:
             name = self.widget_annotation.get_annotation_name('seg')
@@ -1148,14 +1147,10 @@ class MainWindow(QMainWindow):
                 else:
                     QMessageBox.about(self, "Failed", "Fail to add the label\nname is duplicate.")
 
-
-
             self.list_seg_name()
 
     def delete_segmentation(self):
         """Delete the segmentation
-
-        :return:
         """
         if self.widget_segment_list.currentItem() is not None:
             self.data.remove_seg_for_current_img(self.widget_segment_list.currentItem().text())
