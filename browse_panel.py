@@ -165,10 +165,10 @@ class BrowsePanel(QWidget):
                 self.data.images[img_name_id].label_changed = False
 
             
-                self.painter.begin(pixmap)
-                self.draw_points_with_painter(self.painter,points_dict)
-                self.painter.drawPixmap(0,0,self.draw_seg_args(segments_cv))
-                self.painter.end()
+            self.painter.begin(pixmap)
+            self.draw_points_with_painter(self.painter,points_dict)
+            self.painter.drawPixmap(0,0,self.draw_seg_args(segments_cv))
+            self.painter.end()
 
             pixmap = pixmap.scaled(icon_size, aspectRatioMode=Qt.KeepAspectRatio)
             icon = QIcon()
@@ -211,25 +211,10 @@ class BrowsePanel(QWidget):
                 print("browser panel: " + img_name_id)
                 print(img_id)
                 print(points_dict)
-                # self.painter.begin(pixmap)
-                # self.draw_points_args(points_dict)
-
-                # self.painter.drawPixmap(0,0,self.draw_seg_args(segments_cv))
-
-                # self.painter.end()
-                
-                # painter = QPainter()
-                
-                
-                # painter.setCompositionMode(QPainter.CompositionMode_Source)
-                # painter_font = painter.font()
-                # painter_font.setPointSize(painter_font.pointSize() * font_size_scale)
-                # painter.setFont(painter_font)  
-                
+               
                 self.painter.begin(pixmap)
                 self.draw_points_with_painter(self.painter,points_dict)
                 self.painter.drawPixmap(0,0,self.draw_seg_args(segments_cv))
-
                 self.painter.end()
                 
                 pixmap = pixmap.scaled(icon_size, aspectRatioMode=Qt.KeepAspectRatio)
@@ -264,7 +249,6 @@ class BrowsePanel(QWidget):
                         painter.drawEllipse(bbox.center()/(scale), point_size.width(), point_size.height())
                         
                         #get the point name
-                        print(pt.pt_name," pixel length ", font_size.width(pt.pt_name))
                         painter.drawText(bbox.center().x()/(scale) - font_size.width(pt.pt_name)/2,
                                          bbox.center().y()/(scale) - font_size.height()/2,
                                          pt.pt_name)

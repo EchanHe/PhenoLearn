@@ -69,6 +69,7 @@ class MainWindow(QMainWindow):
 
     def initUI(self):
         """Init the UI part
+        Create variables from QT as components
         """
         
         #Function for init UI
@@ -96,8 +97,8 @@ class MainWindow(QMainWindow):
         self.statusBar().showMessage(PROGRAM_NAME)
         self.statusBar().show()
 
-        self.file_dock = QDockWidget('Files', self)
-        self.property_dock = QDockWidget('Annotations', self)
+        self.file_dock = QDockWidget('Files Panel', self)
+        self.property_dock = QDockWidget('Annotations Panel', self)
 
         self.info_dock = QDockWidget('Quick label', self)
 
@@ -304,6 +305,8 @@ class MainWindow(QMainWindow):
         # self.widget_annotation.setCursor(QCursor(icon))
 
     def init_action(self):
+        """Init and create actions for event
+        """
         self.act_opendir = QAction("&Open Image Directory", self, triggered=self.opendir)
         self.act_open_annotations = QAction("Open &Annotation File", self, triggered=self.open_annotations)
         # self.act_set_thumbnail_dir = QAction("Set the folder of icons", self, triggered=self.open_thumbnail_dir)
@@ -326,10 +329,12 @@ class MainWindow(QMainWindow):
 
         self.act_point_mode = QAction("Point", self,  checkable=True)
         self.act_outline_mode = QAction("Seg", self, checkable=True)
+        self.act_view_mode = QAction("View", self,  checkable=True, checked = True)
 
         self.act_group_modes = QActionGroup(self)
+        self.act_group_modes.triggered.connect(self.mode_choosing)
 
-        self.act_group_modes.addAction(QAction("View", self,  checkable=True, checked = True))
+        self.act_group_modes.addAction(self.act_view_mode)
         self.act_group_modes.addAction(self.act_point_mode)
         self.act_group_modes.addAction(self.act_outline_mode)
 
@@ -405,11 +410,11 @@ class MainWindow(QMainWindow):
 
         self.menuBar().addMenu(self.menu_view)
 
-        self.menu_tool = QMenu("&Tool", self)
-        self.menu_tool.addAction(self.act_sort_file_names)
-        self.menu_tool.addAction(self.act_sort_anno_names)
-
-        self.menuBar().addMenu(self.menu_tool)
+        #
+        # self.menu_tool = QMenu("&Tool", self)
+        # self.menu_tool.addAction(self.act_sort_file_names)
+        # self.menu_tool.addAction(self.act_sort_anno_names)
+        # self.menuBar().addMenu(self.menu_tool)
 
         self.toolbar = self.addToolBar("Tool bars")
 
@@ -425,6 +430,8 @@ class MainWindow(QMainWindow):
         self.toolbar_outline.addSeparator()
         self.toolbar_outline.addActions(self.act_group_brushes.actions())
 
+        self.toolbar_outline.hide()
+        
         self.addToolBarBreak()
         self.addToolBar(Qt.TopToolBarArea, self.toolbar_outline)
         
@@ -687,6 +694,14 @@ class MainWindow(QMainWindow):
             current_dir = self.data.work_dir
             save_path, _ = QFileDialog.getSaveFileName(self, 'Export annotations as CSV',current_dir,"CSV (*.csv)")
             self.data.write_csv(save_path)
+
+    def mode_choosing(self):
+        """view, point or seg modes
+        """    
+        if(self.act_outline_mode.isChecked()):
+            self.toolbar_outline.show()
+        else:
+            self.toolbar_outline.hide()
 
 
     def list_file_names(self):
@@ -1050,7 +1065,10 @@ class MainWindow(QMainWindow):
 
 
     def toggle_flag_img(self):
-        """Only show toggle images 
+        """Only show toggled/flagged images 
+        
+        call filter_img(self, img_idx, isfilter) 
+        
         :return:
         """
         if self.data.has_images():

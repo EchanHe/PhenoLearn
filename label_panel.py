@@ -12,7 +12,7 @@ import cv2
 
 # class Communicate(QObject):
 
-
+font_info = QFont('Arial', 14)
 
 class LabelPanel(QWidget):
     """The annotation or label panel
@@ -292,7 +292,8 @@ class LabelPanel(QWidget):
                 for pt in self.data.get_current_scaled_points():
                     if not pt.absence:
                         bbox = pt.rect
-                        self.draw_point(painter ,bbox)
+                        
+                        self.draw_point(painter ,bbox , pt.pt_name)
 
                 ##Setting for drawings Highlight:
                 pen = QPen(Qt.red, 4)
@@ -333,15 +334,23 @@ class LabelPanel(QWidget):
 
 
 
-    def draw_point(self,painter, bbox):
+    def draw_point(self,painter, bbox ,name):
         """Draw points on the canvas
         Args:
             painter (QPainter): QPainter
             bbox (_type_): The bounding box (scaled) of th current point
         """
+        
+        
+        painter.setFont(font_info)
+        font_size = QFontMetrics(font_info)
+        
         # painter.drawEllipse(bbox.center(), TEMP_SHAPE_LENGTH/2 * 1/self.scale, TEMP_SHAPE_LENGTH/2 * 1/self.scale)
         painter.drawEllipse(bbox.center(), bbox.width()//2, bbox.height()//2)
-        # painter.drawText(bbox.center(), "asdf")
+       
+        painter.drawText(bbox.center().x() - font_size.width(name)/2,
+                    bbox.center().y() - font_size.height()/2,
+                    name)
 
 
     def draw_polygons(self,painter, contours , colour = QColor(0, 255, 255, 200)):
@@ -439,7 +448,7 @@ class LabelPanel(QWidget):
     def draw_seg_cv(self,img_cv_draw,contour_cv,color):
         """
         Draw opencv image using contours
-        Convert img to qpixmap
+        Convert img to QPixmap
 
         :param contour_cv:
         :return:
@@ -497,7 +506,7 @@ class LabelPanel(QWidget):
         img_cv_draw = np.zeros((height, width ,4)).astype('uint8')
         img_cv_draw = cv2.cvtColor(img_cv_draw,cv2.COLOR_BGRA2RGBA)
 
-        # Draw the segmentations using segmentaion cv
+        # Draw the segmentations using segmentation cv
         if segments_cv:
             if self.parent():
                 for item, color in zip(items, colors):
