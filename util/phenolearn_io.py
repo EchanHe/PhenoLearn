@@ -282,7 +282,7 @@ def check_imgs(img_dir, df):
 #     check_imgs(img_dir, df)
 
 
-def transfer_json_to_df_by_cols(data, coord_cols =False, outline_cols=False, prop_cols=False):
+def transfer_json_to_df_by_cols(data, coord_cols =False, outline_cols=False, prop_cols=False , mode='all'):
     """
 
     :param df:
@@ -302,28 +302,32 @@ def transfer_json_to_df_by_cols(data, coord_cols =False, outline_cols=False, pro
 
         df.loc[id_row , 'file'] =  file_name
 
-        if points and (coord_cols != False):
-            for idx, pt in enumerate(points):
-                if coord_cols is None:
-                    df.loc[id_row,"pt_" + pt['name']+'_x'] = pt['x']
-                    df.loc[id_row,"pt_" +pt['name']+'_y'] = pt['y']
-                else:
-                    df.loc[id_row, coord_cols[idx]+'_x'] = pt['x']
-                    df.loc[id_row, coord_cols[idx]+'_y'] = pt['y']
+        if mode=="all" or mode =="point":
 
-        if segs and (outline_cols != False):
-            for idx, (key, seg) in enumerate(segs.items()):
-                if outline_cols is None:
-                    df.loc[id_row,"seg_" + key] = str(seg['contours'])
-                else:
-                    df.loc[id_row,outline_cols[idx]] = str(seg['contours'])
+            if points and (coord_cols != False):
+                for idx, pt in enumerate(points):
+                    if coord_cols is None:
+                        df.loc[id_row, pt['name']+'_x'] = pt['x']
+                        df.loc[id_row, pt['name']+'_y'] = pt['y']
+                    else:
+                        df.loc[id_row, coord_cols[idx]+'_x'] = pt['x']
+                        df.loc[id_row, coord_cols[idx]+'_y'] = pt['y']
 
-        if props and (prop_cols != False):
-            for idx, (key, prop) in enumerate(props.items()):
-                if prop_cols is None:
-                    df.loc[id_row, "prop_" + key] = str(prop)
-                else:
-                    df.loc[id_row, prop_cols[idx]] = str(prop)
+        if mode=="all" or mode =="seg":
+            if segs and (outline_cols != False):
+                for idx, (key, seg) in enumerate(segs.items()):
+                    if outline_cols is None:
+                        df.loc[id_row, key] = str(seg['contours'])
+                    else:
+                        df.loc[id_row,outline_cols[idx]] = str(seg['contours'])
+
+        if mode=="all":
+            if props and (prop_cols != False):
+                for idx, (key, prop) in enumerate(props.items()):
+                    if prop_cols is None:
+                        df.loc[id_row, "prop_" + key] = str(prop)
+                    else:
+                        df.loc[id_row, prop_cols[idx]] = str(prop)
     return df
 
 if __name__ == "__main__":    # train(anno_file="input_dir/pt.csv",img_dir="input_dir/",

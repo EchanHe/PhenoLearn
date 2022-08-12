@@ -207,7 +207,7 @@ class Point():
         point = {'pt_name':self.pt_name,'x':self.x,'y':self.y,'absence':self.absence,'error':self.error}
         return point
 
-    # Deprecate
+    # Deprecate@@
     def undo_set_point(self):
         if self.cache is not None:
             self.set_point(self.cache['pt_name'], self.cache['x'], self.cache['y'],
@@ -335,10 +335,10 @@ class Data():
 
         if file_name == None:
             self.file_name = "untitled.json"
-            self.no_anno_file = True
+            self.has_anno_file = False
         else:
             self.file_name = file_name
-            self.no_anno_file = False
+            self.has_anno_file = True
         self.changed = False
 
         # Sorting part
@@ -346,63 +346,117 @@ class Data():
         self.images_origin = None
         self.points_origin = None
 
+        self.img_props = {}
+
         self.init_images()
 
+    def restore_to_empty(self):
+        self.img_size=0
 
-    def init_images(self):
-        self.images = []
+
+        self.work_dir = None
+        
         self.images = {}
 
         self.pt_names = set()
         self.seg_names = set()
         self.img_props = {}
+    
+    def init_images(self):
+        """initial the images of Data class
+        """        
+        
+        # self.images = []
+        self.images = {}
+
+        self.pt_names = set()
+        self.seg_names = set()
+        
 
 
 
-        if self.work_dir is not None:
+        if self.work_dir:
             # Get list of images in the image dir
             extensions = ['.%s' % fmt.data().decode("ascii").lower() for fmt in QImageReader.supportedImageFormats()]
             work_dir_file_names = [os.path.basename(file_name) for file_name in Path(self.work_dir).glob('*')  if str(file_name).lower().endswith(tuple(extensions))]
 
-            if not self.no_anno_file:
-            # Has annotation file
+            # if self.has_anno_file:
+            # # Has annotation file
 
-                # with open(self.file_name, "r") as read_file:
-                #     data = json.load(read_file)
+            #     # data_file_names = [entry_temp['file_name'] for entry_temp in self.data]
 
-                # Init images list
-                for entry in self.data:
-                    if entry['file_name'] in work_dir_file_names:
-                        image = Image(entry['file_name'] ,
-                                       entry.get('points', None),
-                                      entry.get('outlines', None),
-                                      entry.get("outlines_cv" , None),
-                                      entry.get("property", None)
-                                      )
-                        #self.images.append(image)
+            #     dict_names_id = {entry_temp['file_name']: idx for idx,entry_temp in enumerate(self.data) }
+            #     # Init images list
+            #     for name in work_dir_file_names:
+            #         #Iterate through the directory
+            #         #if annotation file
+            #         if name in dict_names_id:
 
-                        self.images[entry['file_name']] = image
-                        # Update points names of all
-                        for pt in entry['points']:
-                            self.pt_names.add(pt['name'])
-                        #Update seg name for all seg
-                        for key,_ in entry.get("outlines_cv", {}).items():
-                            self.seg_names.add(key)
+            #             entry = self.data[dict_names_id[name]]
+            #              # create a Image instance for every image
+            #             image = Image(entry['file_name'] ,
+            #                            entry.get('points', None),
+            #                           entry.get('outlines', None),
+            #                           entry.get("outlines_cv" , None),
+            #                           entry.get("property", None)
+            #                           )
+            #             #self.images.append(image)
 
-                        #Update outline names
-                        for key,item in entry.get("property", {}).items():
+            #             self.images[entry['file_name']] = image
+            #             # Update points names of all
+            #             for pt in entry['points']:
+            #                 self.pt_names.add(pt['name'])
+            #             #Update seg name for all seg
+            #             for key,_ in entry.get("outlines_cv", {}).items():
+            #                 self.seg_names.add(key)
 
-                            if key in self.img_props:
-                                self.img_props[key].append(item)
-                            else:
-                                self.img_props[key] = [item]
+            #             #Update outline names
+            #             for key,item in entry.get("property", {}).items():
 
-            else:
+            #                 if key in self.img_props:
+            #                     self.img_props[key].append(item)
+            #                 else:
+            #                     self.img_props[key] = [item]
+            #         else:
+            #             image = Image(name)
+            #             # self.images.append(image)
+            #             self.images[name] = image
+                
+                # for entry in self.data:
+                #     if entry['file_name'] in work_dir_file_names:
+                        
+                #         # create a Image instance for every image
+                #         image = Image(entry['file_name'] ,
+                #                        entry.get('points', None),
+                #                       entry.get('outlines', None),
+                #                       entry.get("outlines_cv" , None),
+                #                       entry.get("property", None)
+                #                       )
+                #         #self.images.append(image)
+
+                #         self.images[entry['file_name']] = image
+                #         # Update points names of all
+                #         for pt in entry['points']:
+                #             self.pt_names.add(pt['name'])
+                #         #Update seg name for all seg
+                #         for key,_ in entry.get("outlines_cv", {}).items():
+                #             self.seg_names.add(key)
+
+                #         #Update outline names
+                #         for key,item in entry.get("property", {}).items():
+
+                #             if key in self.img_props:
+                #                 self.img_props[key].append(item)
+                #             else:
+                #                 self.img_props[key] = [item]
+                    
+
+            
             # without annotation file
-                for name in work_dir_file_names:
-                    image = Image(name)
-                    # self.images.append(image)
-                    self.images[name] = image
+            for name in work_dir_file_names:
+                image = Image(name)
+                # self.images.append(image)
+                self.images[name] = image
 
             self.img_size = len(self.images)
             if self.img_size !=0:
@@ -412,10 +466,95 @@ class Data():
 
 
             self.filter_idx = list(range(0,self.img_size))
+            # idx for showing flagged images from browse mode
             self.flagged_img_idx= []
+            # idx for filtering in Review assistant
             self.filtered_img_idx = list(self.images.keys())
 
             self.img_id_order = list(self.images.keys())
+
+    def read_anno(self):
+        """read annotation file and add annotations to images
+        """     
+        dict_names_id = {entry_temp['file_name']: idx for idx,entry_temp in enumerate(self.data) }
+        # Init images list
+        for name in self.img_id_order:
+            #Iterate through the directory
+            #if annotation file
+
+            if name in dict_names_id:
+                # update the data that annotation file has.
+                
+                entry = self.data[dict_names_id[name]]
+                
+                image = Image(entry['file_name'] ,
+                    entry.get('points', None),
+                    entry.get('outlines', None),
+                    entry.get("outlines_cv" , None),
+                    entry.get("property", None)
+                )
+                #self.images.append(image)
+
+                self.images[entry['file_name']] = image
+                
+                for pt in entry['points']:
+                    self.pt_names.add(pt['name'])
+                    
+                #Update seg name for all seg
+                for key,_ in entry.get("outlines_cv", {}).items():
+                    self.seg_names.add(key)
+
+                #Update outline names
+                for key,item in entry.get("property", {}).items():
+
+                    if key in self.img_props:
+                        self.img_props[key].append(item)
+                    else:
+                        self.img_props[key] = [item]
+
+
+    def import_properties(self, df):
+        """Read the dataframe(csv) and assign properties to images
+        """        
+        
+        self.img_props = {}
+        for idx, row in df.iterrows():
+            prop_dict={}
+            #if the file name appear in the dataset directory
+            if idx in self.images:
+                #build the property dictionary by iterating through df
+                for col in df.columns:
+
+                    row[col]
+                    prop_dict[col]=row[col]
+                    
+                    # assign property dictionary to the image
+                    self.images[idx].property = prop_dict
+                    
+                    # update the global image 
+                    if col in self.img_props:
+                        self.img_props[col].append(row[col])
+                    else:
+                        self.img_props[col] = [row[col]]
+                        
+    def import_segs(self, df):
+        """Read the dataframe(csv) and assign segmentation to images
+        """        
+        for idx, row in df.iterrows():
+            seg_dict={}
+            #if the file name appear in the dataset directory
+            if idx in self.images:
+                
+                for col in df.columns:
+                    if row[col]!=None:
+                        # contours = 
+                        seg_dict[col]= {"contours" : eval(row[col])}
+                        # seg_dict[col]["contours"] = eval(row[col])
+
+
+            self.images[idx].segments_cv = seg_dict
+            
+            self.seg_names.add(col)
 
     def sort(self, value):
         if value == True:
@@ -429,9 +568,17 @@ class Data():
             self.img_id_order = list(self.images.keys())
 
     def sort_by_value(self,value):
+        """Sort the images by give property name
 
-        self.img_id_order = [x for _,x in sorted(zip(self.img_props[value],list(self.images.keys())))]
+        Args:
+            value (_type_): property name (continuos)
+        """        
+        
+        self.img_id_order = [x for _,x in sorted(zip(self.img_props[value],list(self.images.keys())), 
+                                                 key=lambda x: (x[0] is None, x[0]))]
 
+    def restore_image_order(self):
+        self.img_id_order =list(self.images.keys())
 
     def set_image_id(self, idx):
         self.current_image_id = idx
@@ -448,19 +595,19 @@ class Data():
     def set_file_name(self,file_name):
         """csv or json"""
 
-        self.no_anno_file = False
+        self.has_anno_file = True
         self.file_name = file_name
 
         with open(self.file_name, "r") as read_file:
             self.data = json.load(read_file)
 
-        self.init_images()
+        self.read_anno()
 
 
     def set_file_name_csv(self,file_name, id_col , coord_cols, outline_cols, prop_cols ):
         """csv or json"""
 
-        self.no_anno_file = False
+        self.has_anno_file = True
         self.file_name = file_name[:-3] + ".json"
 
         df = pd.read_csv(file_name)
@@ -836,15 +983,16 @@ class Data():
             return False
 
     def toggle_flag_img(self, state):
-        """
-        Set the data as flagged mode
+        """Set the data as flagged mode
         Intersect ( flag idx, self.filter_idx)
 
-        Change the current image into first flagged image
+        Args:
+            state (_type_): Flag mode is True or False
 
-        :param state: Flag mode is True or False
-        :return: indices of flagged images
-        """
+        Returns:
+            _type_: indices of flagged images
+        """        
+
 
         if state == True:
             self.flagged_img_idx =  [key for key, img in self.images.items() if img.attention_flag == True]
@@ -884,9 +1032,8 @@ class Data():
     #         self.current_image_id = self.numerical_id_to_image_id(self.filter_idx[0])
     #     return self.filter_idx
 
-    def filter_imgs_by_review_assist(self, filtered_dict):
-        """
-        Change the current image into first flagged image
+    def filter_review_assist(self, filtered_dict):
+        """Change the current image into first flagged image
         Intersect ( flag idx, self.filter_idx)
 
         :return: list of names of filtered images
@@ -904,6 +1051,11 @@ class Data():
 
         return self.filtered_img_idx
 
+    def reset_filter_review_assist(self):
+        """Reset the filter_img_idx to the original order (when imported)
+        """
+        self.filtered_img_idx = np.array(list(self.images.keys()))
+
 
     def write_json(self, save_name = None):
         # Create data form to save
@@ -919,12 +1071,54 @@ class Data():
         self.changed = False
 
 
-    def write_csv(self, save_name):
+    def write_csv(self, save_name, mode='all'):
+        """Export csv to computer
+
+        Args:
+            save_name (_type_): The name of the csv file
+            mode (str, optional): "seg" or "point. Defaults to 'all'.
+        """        
         # Create data form to save
 
         image_list = self.get_json()
-        df = phenolearn_io.transfer_json_to_df_by_cols(image_list, coord_cols =None, outline_cols=None, prop_cols=None)
+        df = phenolearn_io.transfer_json_to_df_by_cols(image_list, coord_cols =None, outline_cols=None, prop_cols=None, mode=mode)
         df.to_csv(save_name , index=None)
+
+    def write_mask(self, dir):
+        """Write mask to dir
+
+        Args:
+            dir (_type_): The folder to save the masks
+        """        
+        key_of_contour = list(self.seg_names)[0]
+        
+        for img_idx, img_item in self.images.items():
+            img_temp = cv2.imread(os.path.join(self.work_dir, img_idx))
+            mask_temp = np.zeros(img_temp.shape)
+            
+            
+            if key_of_contour in img_item.segments_cv:
+                contour_cv= img_item.segments_cv[key_of_contour]['contours']
+            
+            
+                contour_cv = [np.array(contour, dtype='int32') for contour in contour_cv]
+                cv2.fillPoly(mask_temp, contour_cv, (255,255,255))
+            
+            cv2.imwrite(os.path.join(dir, img_idx), mask_temp)
+
+    def import_mask(self, dir,seg_name):
+        """Read images in the dir, and turn the mask into segmentation in the data
+
+        Args:
+            dir (_type_): The folder to load the masks
+            threshold: pixel value to threshold segmentation
+            seg_name: the name of the segmentation
+        """        
+        for img_idx, img_item in self.images.items():
+            thresh = cv2.imread(os.path.join(dir, img_idx), 0 )
+            contours, _ = cv2.findContours(thresh,cv2.RETR_TREE,cv2.CHAIN_APPROX_SIMPLE)
+            contours = [contour.tolist() for contour in contours]
+            img_item.segments_cv[seg_name] = {'contours' : contours}
 
     def get_json(self):
         # Create data form to save

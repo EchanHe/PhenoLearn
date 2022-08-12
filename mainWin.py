@@ -10,8 +10,11 @@ import label_panel
 import browse_panel
 import os
 import pandas as pd
+import numpy as np
 import datetime
 from shutil import copyfile
+from math import nan, isnan
+
 
 from relabelData import Data_gui
 
@@ -100,6 +103,7 @@ class MainWindow(QMainWindow):
         self.file_dock = QDockWidget('Files Panel', self)
         self.property_dock = QDockWidget('Annotations Panel', self)
 
+        # The information showing in quick label.
         self.info_dock = QDockWidget('Quick label', self)
 
 
@@ -114,12 +118,13 @@ class MainWindow(QMainWindow):
 
         self.widget_review_assist = QWidget()
 
-        self.widget_review_assist_combobox = QComboBox()
+        self.widget_review_assist_sorting_box = QComboBox()
 
 
         self.button_review_sort = QPushButton('Sort')
         self.button_review_sort.clicked.connect(self.review_sort)
-        self.buttone_review_reset= QPushButton('Reset')
+        self.button_review_reset= QPushButton('Reset')
+        self.button_review_reset.clicked.connect(self.review_reset)
 
         self.widget_review_tab = QTabWidget()
 
@@ -132,11 +137,11 @@ class MainWindow(QMainWindow):
 
         layout = QVBoxLayout(self.widget_review_assist)
         layout.addWidget(QLabel("Review Assistant"))
-        layout.addWidget(self.widget_review_assist_combobox)
+        layout.addWidget(self.widget_review_assist_sorting_box)
         layout.addWidget(self.button_review_sort)
 
         layout.addWidget(self.widget_review_tab)
-        layout.addWidget(self.buttone_review_reset)
+        layout.addWidget(self.button_review_reset)
 
         # File list part
         self.widget_file_list = QListWidget()
@@ -147,7 +152,8 @@ class MainWindow(QMainWindow):
 
         # self.layout_folder_label = QVBoxLayout()
 
-        self.widget_folder_label= QLabel("Image Dir: {}\nAnnotation file: {}".format("",""))
+        # self.widget_folder_label= QLabel("Image Dir: {}\nAnnotation file: {}".format("",""))
+        self.widget_folder_label= QLabel("")
 
         self.widget_anno_file_label = QLabel("Annotation file: {}".format(self.data.file_name))
         self.scroll_folder_label.setWidget(self.widget_folder_label)
@@ -315,7 +321,15 @@ class MainWindow(QMainWindow):
         self.act_save_as = QAction("Save as", self, triggered=self.save_as)
 
         self.act_import_csv = QAction("Import as csv", self, triggered=self.import_csv)
-        self.act_export_csv = QAction("Export as csv", self, triggered=self.export_csv)
+        self.act_import_seg = QAction("Import Segmentation", self, triggered=lambda: self.import_csv("seg"))
+        
+        self.act_import_props = QAction("Import Properties", self, triggered=lambda: self.import_csv("prop"))
+        
+        self.act_import_img_props = QAction("Import Image as Segmentation", self, triggered=self.import_img_seg)
+        
+        self.act_export_csv_pt = QAction("Export Point", self, triggered=lambda: self.export_csv("point"))
+        self.act_export_csv_seg = QAction("Export Segmentation", self, triggered=lambda: self.export_csv("seg"))
+        self.act_export_mask = QAction("Export Segmentation as images", self, triggered=self.export_mask)
 
         self.act_exit = QAction("E&xit", self, shortcut="Ctrl+Q", triggered=self.close)
 
@@ -378,14 +392,23 @@ class MainWindow(QMainWindow):
         """
         # File part
         self.menu_file = QMenu("&File", self)
-        self.menu_file.addAction(self.act_open_annotations)
         self.menu_file.addAction(self.act_opendir)
+        self.menu_file.addAction(self.act_open_annotations)
+        
         # self.menu_file.addAction(self.act_set_thumbnail_dir)
         self.menu_file.addSeparator()
         self.menu_file.addAction(self.act_save)
         self.menu_file.addAction(self.act_save_as)
-        self.menu_file.addAction(self.act_import_csv)
-        self.menu_file.addAction(self.act_export_csv)
+        
+        self.menu_file.addSeparator()
+        self.menu_file.addAction(self.act_import_seg)
+        self.menu_file.addAction(self.act_import_img_props)
+        self.menu_file.addAction(self.act_import_props)
+        
+        self.menu_file.addSeparator()
+        self.menu_file.addAction(self.act_export_csv_pt)
+        self.menu_file.addAction(self.act_export_csv_seg)
+        self.menu_file.addAction(self.act_export_mask)
         self.menu_file.addSeparator()
         self.menu_file.addAction(self.act_exit)
 
@@ -454,43 +477,55 @@ class MainWindow(QMainWindow):
                                                          QFileDialog.ShowDirsOnly | QFileDialog.DontResolveSymlinks))
 
 
-            if temp and temp != self.work_dir:
+            # if temp and temp != self.work_dir:
+            if temp:    
                 self.work_dir = temp
+                
+                # clean the self.data
+                self.data.restore_to_empty()
+                # set the working directory for dataset
                 self.data.set_work_dir(temp)
                 self.list_file_names()
                 self.list_review_assist()
                 # self.widget_browser.reset_widget()
-                self.widget_folder_label.setText("Image Dir: {}\nAnnotation file: {}".format(os.path.abspath(self.data.work_dir),os.path.abspath(self.data.file_name)))
+                # self.widget_folder_label.setText("Image Dir: {}\nAnnotation file: {}".format(os.path.abspath(self.data.work_dir),os.path.abspath(self.data.file_name)))
+                self.widget_folder_label.setText("Image Dir: {}\n{} images".format(os.path.abspath(self.data.work_dir),len(self.data.img_id_order)))
+                
                 # self.widget_folder_label.setText("Image Dir: {}".format(os.path.abspath(self.data.work_dir)))
+                QMessageBox.about(self, "Directory opened successfully", "{} images are imported".format(len(self.data.img_id_order)))
         except Exception as e:
             print(e)
 
     def open_annotations(self):
-        """Open the annotation file
+        """Open the annotation file.json file.
 
         """
         try:
-            self.message_unsave()
-            options = QFileDialog.Options()
-            # fileName = QFileDialog.getOpenFileName(self, "Open File", QDir.currentPath())
-            file_name, _ = QFileDialog.getOpenFileName(self, 'Open Annotations', '.',
-                                                      'Files (*.json)', options=options)
-            if file_name:
-                file_name = os.path.abspath(file_name)
-                _, extension = os.path.splitext(file_name)
-                if extension == ".json":
-                    self.data.set_file_name(file_name)
-                    self.data.set_changed(False)
+            
+            if self.data.work_dir==None:
+                QMessageBox.about(self, "No image data", "Please select a directory for your images.")
+            else:
+                self.message_unsave()
+                options = QFileDialog.Options()
+                # fileName = QFileDialog.getOpenFileName(self, "Open File", QDir.currentPath())
+                file_name, _ = QFileDialog.getOpenFileName(self, 'Open Annotations', '.',
+                                                        'Files (*.json)', options=options)
+                if file_name:
+                    file_name = os.path.abspath(file_name)
+                    _, extension = os.path.splitext(file_name)
+                    if extension == ".json":
+                        self.data.set_file_name(file_name)
+                        self.data.set_changed(False)
 
 
-                if self.data.work_dir is None:
-                    self.widget_folder_label.setText("Image Dir: {}\nAnnotation file: {}".format("",os.path.abspath(self.data.file_name)))
-                else:
-                    self.widget_folder_label.setText("Image Dir: {}\nAnnotation file: {}".format(os.path.abspath(self.data.work_dir),os.path.abspath(self.data.file_name)))
+                    # if self.data.work_dir is None:
+                    #     self.widget_folder_label.setText("Image Dir: {}\nAnnotation file: {}".format("",os.path.abspath(self.data.file_name)))
+                    # else:
+                    #     self.widget_folder_label.setText("Image Dir: {}\nAnnotation file: {}".format(os.path.abspath(self.data.work_dir),os.path.abspath(self.data.file_name)))
 
-                # self.widget_browser.reset_widget()
-            self.list_review_assist()
-            self.list_file_names()
+                    # self.widget_browser.reset_widget()
+                    self.list_review_assist()
+                    self.list_file_names()
 
         except Exception as e:
             print(e)
@@ -534,9 +569,9 @@ class MainWindow(QMainWindow):
         #     self.data.no_anno_file = False
 
         try:
-            if self.data.no_anno_file:
+            if self.data.has_anno_file:
                 self.save_as()
-                self.data.no_anno_file = False
+                self.data.has_anno_file = False
 
 
             # Save the new data into the same name
@@ -554,32 +589,98 @@ class MainWindow(QMainWindow):
         if self.data:
             current_dir = self.data.work_dir
             save_path, _ = QFileDialog.getSaveFileName(self, 'Saving Annotations',current_dir,"JSON (*.json)")
-            self.data.write_json(save_path)
-            self.data.file_name = save_path
+            # Save the file only path is selected
+            if save_path:
+                self.data.write_json(save_path)
+                self.data.file_name = save_path
                 
 
         # self.widget_anno_file_label.setText("Annotation file: {}".format(self.data.file_name))
 
 
-    def import_csv(self):
-        try:
-            self.message_unsave()
-            options = QFileDialog.Options()
-            # fileName = QFileDialog.getOpenFileName(self, "Open File", QDir.currentPath())
-            file_name, _ = QFileDialog.getOpenFileName(self, 'Import as csv', '.',
-                                                      'Files (*.csv)', options=options)
-            if file_name:
-                file_name = os.path.abspath(file_name)
-                _, extension = os.path.splitext(file_name)
+    def import_csv(self, mode):
+        """import csv as points/segmentation/properties
 
-                if extension =='.csv':
-                    self.file_name_temp_for_csv = file_name
-                    df_data = pd.read_csv(file_name)
-                    self.show_input_csv_detail(df_data)
+        Args:
+            mode (_type_): prop, seg or point
+        """        
+        try:
+            
+            if self.data.work_dir==None:
+                QMessageBox.about(self, "No image data", "Please select a directory for your images.")
+            
+            else:
+                self.message_unsave()
+                options = QFileDialog.Options()
+                # fileName = QFileDialog.getOpenFileName(self, "Open File", QDir.currentPath())
+                file_name, _ = QFileDialog.getOpenFileName(self, 'Import as csv', '.',
+                                                        'Files (*.csv)', options=options)
+                if file_name:
+                    file_name = os.path.abspath(file_name)
+                    _, extension = os.path.splitext(file_name)
+
+                    if extension =='.csv':
+                        self.file_name_temp_for_csv = file_name
+                        self.check_csv(file_name)
+                                                                 
+                        df_data = pd.read_csv(file_name, index_col='file')
+                        has_na= df_data.isnull().values.any()
+                        df_data = df_data.fillna(np.nan).replace([np.nan], [None])
+                        if mode=="prop":
+                            self.data.import_properties(df_data)
+                        
+                        if mode=="seg":
+                            self.data.import_segs(df_data)
+                        # self.show_input_csv_detail(df_data)
+
+
+                self.list_review_assist()
+                self.list_file_names()
 
         except Exception as e:
             print(e)
+            
+            QMessageBox.warning(self,"Warning" , str(e))
 
+    def import_img_seg(self):
+        """Open a directory and import images that have the same names from data images as the segmentation
+        """        
+        
+        def get_seg_name():
+            text, ok = QInputDialog.getText(self, 'Segmentation Name', 'Enter the segmentation name:')
+            
+            if ok and text!="":
+                return text
+            else:
+                return False
+        
+        if self.data.work_dir==None:
+            QMessageBox.about(self, "No image data", "Please select a directory for your images.")
+        else:
+            try:
+                assert len(self.data.seg_names) == 0, "The dataset has already had segmentation, please reload the dataset and import segmentation again"
+                defaultOpenDirPath = os.path.dirname(self.file_path) if self.file_path else '.'  
+                dir = (QFileDialog.getExistingDirectory(self,
+                                                                'Open dir for images', defaultOpenDirPath,
+                                                                QFileDialog.ShowDirsOnly | QFileDialog.DontResolveSymlinks))
+
+                
+                if dir:
+                    result = get_seg_name()
+                    assert result !=False, "No name has been given, import fail"
+                    
+                    self.data.import_mask(dir, result)
+    
+                    self.list_review_assist()
+                    self.list_file_names()
+
+            except Exception as e:           
+                QMessageBox.warning(self,"Warning" , str(e))
+
+    def check_csv(self,file_name):
+        df = pd.read_csv(file_name)
+        assert 'file' in df.columns, "The csv file doesn't have a column named \'file\' that stores image names."
+        
 
     def is_str_list(self, s):
         try:
@@ -689,12 +790,38 @@ class MainWindow(QMainWindow):
         self.list_review_assist()
         self.list_file_names()
 
-    def export_csv(self):
-        if self.data:
+    def export_csv(self, mode):
+        """Export annotations as csv
+        """        
+        if self.data.work_dir==None:
+            QMessageBox.about(self, "No image data", "Can not export without image data")
+        elif self.data:
             current_dir = self.data.work_dir
             save_path, _ = QFileDialog.getSaveFileName(self, 'Export annotations as CSV',current_dir,"CSV (*.csv)")
-            self.data.write_csv(save_path)
+            # Save the file only path is selected
+            if save_path:
+                self.data.write_csv(save_path, mode)
+    
+    def export_mask(self):
+        """Select a folder and save masks as images to the folder
+        """   
+        if self.data.work_dir==None:
+            QMessageBox.about(self, "No image data", "Can not export without image data")
+        else:
+            # print("s")   
+            try:
+                assert len(self.data.seg_names) == 1, "Export segmentation into images only works for one-class segmentation"
+                defaultOpenDirPath = os.path.dirname(self.file_path) if self.file_path else '.'  
+                dir = (QFileDialog.getExistingDirectory(self,
+                                                                'Open dir for images', defaultOpenDirPath,
+                                                                QFileDialog.ShowDirsOnly | QFileDialog.DontResolveSymlinks))
 
+                if dir:
+                    self.data.write_mask(dir)
+
+            except Exception as e:           
+                QMessageBox.warning(self,"Warning" , str(e))
+            
     def mode_choosing(self):
         """view, point or seg modes
         """    
@@ -733,17 +860,32 @@ class MainWindow(QMainWindow):
 
 
     def list_review_assist(self):
-        """List specimen characteristics on Review assistant （review panel）
-        The default is the Name
+        """Review assistant function: List properties/characteristics on Review assistant （review panel）
+        
+        Iterate through the properties
+            create tab and checkable items for discrete properties
+            create continuous properties in widget_review_assist_sorting_box
+        
+        
         """        
-        self.widget_review_assist_combobox.clear()
+        self.widget_review_assist_sorting_box.clear()
+        self.widget_review_tab.clear()
+        
         # list in review properties
-        for key,item in self.data.img_props.items():
-            if type(item[0]) is not str:
+        for key,props in self.data.img_props.items():
+            is_discrete_prop = any(type(prop) is str for prop in props)
+            is_continuos_prop = any(isinstance(prop, (int, float, complex)) and not isinstance(prop, bool) for prop in props)
+            # sorting
+            if is_continuos_prop and not is_discrete_prop:
+                
+                self.widget_review_assist_sorting_box.addItem(key)
+            # filtering
+            elif is_discrete_prop and not is_continuos_prop:
+                #get the properties
+                props_remove_nan_list = [x for x in list(set(props)) if x != None]
+           
 
-                self.widget_review_assist_combobox.addItem(key)
-            else:
-                props = sorted(list(set(item)))
+                props = sorted(props_remove_nan_list)
                 widget_list = QListWidget()
                 widget_list.itemChanged.connect(self.widget_review_properties_item_click_filter)
                 for prop in props:
@@ -758,8 +900,10 @@ class MainWindow(QMainWindow):
 
 
     def widget_review_properties_item_click_filter(self, item):
-        """
-        Filter image list when properties are unchecked
+        """Review assistant function: Filtering
+        
+        Filter image list when properties/characteristics are unchecked
+        Update file list and annotation panel
         """
         filtered_dict = {}
         for tab_text, widget in iter_all_tab_widgets(self.widget_review_tab):
@@ -769,24 +913,53 @@ class MainWindow(QMainWindow):
                 if item.checkState():
                     filtered_dict[prop_key].append(item.text())
 
-        flagged_img_idx = self.data.filter_imgs_by_review_assist(filtered_dict)
+        #get filter idx
+        filtered_img_idx = self.data.filter_review_assist(filtered_dict)
 
+        #combine filtered and flagged idx.
         if self.act_attention_imgs_only.isChecked():
-            flagged_img_idx = list(set(flagged_img_idx) & set(self.data.flagged_img_idx))
+            filtered_img_idx = list(set(filtered_img_idx) & set(self.data.flagged_img_idx))
 
-        self.filter_img(flagged_img_idx, True)
+        self.list_file_names()
+        self.widget_annotation.update()
 
     def review_sort(self):
-        if self.widget_review_assist_combobox.count()>0:
-            print(" sort images by files")
-            self.data.sort_by_value(self.widget_review_assist_combobox.currentText())
-            self.list_file_names()
+        """Review assistant function: Sorting
+        
+        Sort the images by selected properties.
+        Update file list and annotation panel
+        """        
+        if self.widget_review_assist_sorting_box.count()>0:
 
+            self.data.sort_by_value(self.widget_review_assist_sorting_box.currentText())
+            self.list_file_names()
+            self.widget_annotation.update()
+
+    def review_reset(self):
+        """Review assistant function:
+        
+        Reset sorting and filtering
+        Reset the tab and checkable items in review assistant
+        Update file list and annotation panel
+        """        
+       
+        self.data.restore_image_order()
+        self.data.reset_filter_review_assist()
+        
+        for _, widget in iter_all_tab_widgets(self.widget_review_tab):
+            for item in iter_all_list_items(widget):
+                item.setCheckState(Qt.Checked)
+        
+        self.list_file_names()
+        self.widget_annotation.update()
+        
+        
     def list_point_name(self):
         """List names of points on the point panel
         
         Called when selected image changed, point added or deleted
         """
+        
 
         self.widget_point_list.clear()
         points = self.data.get_current_image_points()
@@ -808,7 +981,7 @@ class MainWindow(QMainWindow):
                 self.widget_point_list.setCurrentRow(idx)
 
     def list_seg_name(self):
-        """List segmentations to the seg list widget in the annotation panel
+        """List segmentation to the seg list widget in the annotation panel
         Combining segmentation name and colour information into a dict
         
         Called when selected image changed, seg added or deleted
@@ -1000,6 +1173,10 @@ class MainWindow(QMainWindow):
 
 
     def toggle_quick_label_mode(self):
+        """Toggle the mode of whether users can quick label every images
+        Points: Click and label points based on the existed points
+        Segmentation: seg classes are generated for all images
+        """        
         if self.data.has_images():
             if self.act_quick_label_mode.isChecked():
                 self.current_quick_points =[item.text() for item in iter_all_list_items(self.widget_point_list)]
@@ -1008,14 +1185,15 @@ class MainWindow(QMainWindow):
                 cur_seg_str = "\n".join(["{}.{}".format(idx+1, name) for idx, name in enumerate(self.current_quick_segs)])
 
                 reply = QMessageBox.question(self, "Enable quick label?",
-                                             "Points:\n{}\n\nSegmentations:\n{}\n".format(cur_pt_str,cur_seg_str),
+                                             "The points and Segmentation of the selected image will be used as the annotation guideline.\n\n"\
+                                                 "Points:\n{}\n\nSegmentation:\n{}\n".format(cur_pt_str,cur_seg_str),
                               QMessageBox.Yes |QMessageBox.No)
 
                 if reply == QMessageBox.Yes:
                     ## start the quick label
                     self.widget_quick_label.setVisible(True)
                     # self.info_dock.setVisible(True)
-                    self.label_quick_pt.setText("Points:\n"+cur_pt_str)
+                    self.label_quick_pt.setText("Predefined labels\n\nPoints:\n"+cur_pt_str)
                     self.label_quick_seg.setText("Segmentations:\n"+cur_seg_str)
                     #  +"\nNote: These segmentation classes are automatically added to images without any segmentaions."
                 else:
@@ -1065,7 +1243,7 @@ class MainWindow(QMainWindow):
 
 
     def toggle_flag_img(self):
-        """Only show toggled/flagged images 
+        """Browse mode: Only show toggled/flagged images 
         
         call filter_img(self, img_idx, isfilter) 
         
@@ -1174,6 +1352,7 @@ class MainWindow(QMainWindow):
             self.data.remove_seg_for_current_img(self.widget_segment_list.currentItem().text())
 
             self.list_seg_name()
+
 
 
 
