@@ -204,7 +204,8 @@ class Point():
 
 
     def get_point_props_dict(self):
-        point = {'pt_name':self.pt_name,'x':self.x,'y':self.y,'absence':self.absence,'error':self.error}
+        # point = {'pt_name':self.pt_name,'x':self.x,'y':self.y,'absence':self.absence,'error':self.error}
+        point = {'pt_name':self.pt_name,'x':self.x,'y':self.y}
         return point
 
     # Deprecate@@
@@ -235,7 +236,8 @@ class Image():
 
         if pts_list:
             for pt in pts_list:
-                point = Point(pt['name'], pt['x'] , pt['y'], absence=pt.get("absence", False))
+                # point = Point(pt['name'], pt['x'] , pt['y'], absence=pt.get("absence", False))
+                point = Point(pt['name'], pt['x'] , pt['y'])
                 self.points_dict[pt['name']] = point
 
         if segments_list:
@@ -249,7 +251,10 @@ class Image():
             self.segments_cv = {}
 
         ## specimen property
-        self.property = property
+        if property:
+            self.property = property
+        else:
+            self.property = {}
 
 
         if len(self.points_dict)!=0:
@@ -316,7 +321,7 @@ class Image():
         return self.points_dict[self.current_pt_key]
         # return self.points[self.current_pt_id]
 
-    def get_curent_pt_props_dict(self):
+    def get_current_pt_props_dict(self):
         return self.points_dict[self.current_pt_key].get_point_props_dict()
         # return self.points[self.current_pt_id].get_point_props_dict()
 
@@ -373,7 +378,8 @@ class Data():
         self.seg_names = set()
         
 
-
+        self.file_name = "untitled.json"
+        self.has_anno_file = False
 
         if self.work_dir:
             # Get list of images in the image dir
@@ -505,6 +511,7 @@ class Data():
                     self.seg_names.add(key)
 
                 #Update outline names
+                
                 for key,item in entry.get("property", {}).items():
 
                     if key in self.img_props:
@@ -722,7 +729,8 @@ class Data():
         if seg_name not in cur_seg_names:
             self.get_current_image_segments_cv()[seg_name]={"contours":None}
             self.seg_names.add(seg_name)
-
+            self.changed = True
+            
             return True
         else:
             return False
@@ -798,8 +806,15 @@ class Data():
     # end #
 
     def trans_current_segment_to_contour_cv(self, segment, segment_name, contour_colour):
+        """Convert the drawing from images to contours from Opencv and save the contours in self
+
+        Args:
+            segment (_type_): drawing/segmentation
+            segment_name (_type_): The name of the segmentation class
+            contour_colour (_type_): The colour for the segmentation
+        """        """"""
         """
-        Convert the segmentaion from images to
+        
         :param canvas:
         :param contour_name:
         :return:
@@ -834,14 +849,18 @@ class Data():
 
         contours = [contour.tolist() for contour in contours]
         self.get_current_image_segments_cv()[segment_name]['contours'] = contours
+        
+        self.changed=True
 
     def close_current_segment(self, segment, segment_name, contour_colour):
-        """
-        Convert the segmentaion from images to
-        :param canvas:
-        :param contour_name:
-        :return:
-        """
+        """Auto fill closed outlines that were drawn on the segmetnation.
+        Called from auto_fill() from the main file.
+
+        Args:
+            segment (_type_): drawing/segmentation
+            segment_name (_type_): The name of the segmentation class
+            contour_colour (_type_): The colour for the segmentation
+        """        
         # Get the mask of current segmentation
         image = segment.toImage()
         image = image.convertToFormat(QImage.Format_RGBA8888)
@@ -874,8 +893,7 @@ class Data():
         self.get_current_image_segments_cv()[segment_name]['contours'] = contours
 
     def remove_pt_for_current_img(self, key = None):
-        """
-        Remove the current point or point with key given
+        """Remove the current point or point with key given
 
 
         :param idx:
@@ -896,16 +914,16 @@ class Data():
 
 
         :param idx:
-        :return:
+
         """
         if key is None:
             key = self.get_current_image().current_pt_key
 
+        self.get_current_image_segments_cv().pop(key , None)
 
-        seg = self.get_current_image_segments_cv().pop(key , None)
+        self.changed = True
 
-
-        return seg
+        # return seg
 
 
     def get_current_pt_of_current_img(self):
@@ -1119,16 +1137,24 @@ class Data():
             contours, _ = cv2.findContours(thresh,cv2.RETR_TREE,cv2.CHAIN_APPROX_SIMPLE)
             contours = [contour.tolist() for contour in contours]
             img_item.segments_cv[seg_name] = {'contours' : contours}
+            
+            print(img_idx)
 
     def get_json(self):
+        """Turn the data stored in self.images into a list (contains sub lists and dicts)
+        
+        Returns:
+            _type_: The list which can be used for writing the json
+        """
         # Create data form to save
         image_list = []
-        for key, image in self.images.items():
+        for _, image in self.images.items():
             entry = {'file_name': image.img_name}
             # points list
             points = []
-            for key, pt in image.points_dict.items():
-                pt_data = {"name": pt.pt_name, "x": pt.x, "y": pt.y, "info": pt.info,"error": pt.error, "absence": pt.absence}
+            for _, pt in image.points_dict.items():
+                # pt_data = {"name": pt.pt_name, "x": pt.x, "y": pt.y, "info": pt.info,"error": pt.error, "absence": pt.absence}
+                pt_data = {"name": pt.pt_name, "x": pt.x, "y": pt.y}
                 points.append(pt_data)
             entry['points'] = points
 
@@ -1171,8 +1197,9 @@ class Data_gui(Data, QObject):
         pt = super().remove_pt_for_current_img(idx)
 
         self.value_change(True)
+        self.changed=True
+        
         self.push_undo({"pt_remove":pt})
-
         self.set_current_img_changed(True)
 
     def add_pt_for_current_img(self, pt_name, x, y, scaled_coords= True):

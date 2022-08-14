@@ -18,10 +18,32 @@ from math import nan, isnan
 
 from relabelData import Data_gui
 
-# from deep_learning_tool import phenolearn_io
 
 
-PROGRAM_NAME = 'Relabelling'
+
+PROGRAM_NAME = 'PhenoLearn'
+
+def set_widget_font_size(widget, size=None, offset=None, bold = False):
+    """Helper function that sets the widget's font size (setPointSize(size))
+
+    Args:
+        widget (_type_): Widget instance
+        size (_type_): Size
+        offset: the size offset on original size
+    """
+    font = widget.font()
+    
+    if bold:
+        font.setBold(bold)
+    
+    if offset!=None and size==None:
+        print(font.pointSize() , font.pointSize()+offset)
+        font.setPointSize(font.pointSize()+offset)
+    elif offset==None and size!=None:
+        font.setPointSize(size)
+    else:
+        return
+    widget.setFont(font)
 
 def create_table_item(value, editbale = True):
     """Create item for table
@@ -100,11 +122,11 @@ class MainWindow(QMainWindow):
         self.statusBar().showMessage(PROGRAM_NAME)
         self.statusBar().show()
 
-        self.file_dock = QDockWidget('Files Panel', self)
-        self.property_dock = QDockWidget('Annotations Panel', self)
+        self.file_dock = QDockWidget('File Panel', self)
+        self.property_dock = QDockWidget('Annotation Panel', self)
 
         # The information showing in quick label.
-        self.info_dock = QDockWidget('Quick label', self)
+        self.info_dock = QDockWidget('Fast Labelling', self)
 
 
         self.info_dock.setVisible(False)
@@ -136,7 +158,8 @@ class MainWindow(QMainWindow):
 
 
         layout = QVBoxLayout(self.widget_review_assist)
-        layout.addWidget(QLabel("Review Assistant"))
+        self.label_review_assist = QLabel("Review Assistant")
+        layout.addWidget(self.label_review_assist)
         layout.addWidget(self.widget_review_assist_sorting_box)
         layout.addWidget(self.button_review_sort)
 
@@ -145,6 +168,8 @@ class MainWindow(QMainWindow):
 
         # File list part
         self.widget_file_list = QListWidget()
+
+
 
         self.widget_file_list.currentRowChanged.connect(self.file_list_current_item_changed)
 
@@ -230,16 +255,18 @@ class MainWindow(QMainWindow):
         self.widget_props_table.horizontalHeader().setVisible(False)
 
 
-        ## Quick label widget
+        ## Fast labelling widget
         self.widget_quick_label = QWidget()
 
         self.str_quick_pt = "Points:"
         self.str_quick_seg = "Segmentation\nclasses:"
 
+        self.label_quick_title = QLabel("Pre-defined Annotations:")
         self.label_quick_pt = QLabel(self.str_quick_pt)
         self.label_quick_seg = QLabel(self.str_quick_seg)
-        self.layout_quick_label = QHBoxLayout()
+        self.layout_quick_label = QVBoxLayout()
 
+        self.layout_quick_label.addWidget(self.label_quick_title)
         self.layout_quick_label.addWidget(self.label_quick_pt)
         self.layout_quick_label.addWidget(self.label_quick_seg)
         self.widget_quick_label.setLayout(self.layout_quick_label)
@@ -305,6 +332,47 @@ class MainWindow(QMainWindow):
         self.list_file_names()
 
 
+        ## set the font for UI ##
+        set_widget_font_size(self.widget_file_list, offset=2)
+        set_widget_font_size(self.widget_anno_tabs,offset=2)
+        set_widget_font_size(self.widget_segment_list, offset=2)
+        set_widget_font_size(self.widget_point_list, offset=2)
+        set_widget_font_size(self.button_add_seg, offset=2)
+        set_widget_font_size(self.button_del_pt, offset=2)
+        set_widget_font_size(self.button_del_seg, offset=2)
+        
+        set_widget_font_size(self.file_dock, offset=2, bold=True)
+        set_widget_font_size(self.property_dock, offset=2, bold=True)
+        
+        set_widget_font_size(self.menuBar(), offset=3)
+        set_widget_font_size(self.menu_file, offset=2)
+        set_widget_font_size(self.menu_view, offset=2)
+        
+        set_widget_font_size(self.label_quick_title, offset=1,bold=True)
+        set_widget_font_size(self.label_quick_pt, offset=1)
+        set_widget_font_size(self.label_quick_seg, offset=1)
+        
+        set_widget_font_size(self.widget_review_assist_sorting_box, offset=2)
+        set_widget_font_size(self.widget_review_properties, offset=2)
+        set_widget_font_size(self.widget_review_tab, offset=2)
+        set_widget_font_size(self.button_review_reset, offset=2)
+        set_widget_font_size(self.button_review_sort, offset=2)
+        set_widget_font_size(self.label_review_assist, offset=2 , bold=True)
+        
+        set_widget_font_size(self.act_point_mode, offset=2)
+        set_widget_font_size(self.act_view_mode, offset=2)
+        set_widget_font_size(self.act_outline_mode, offset=2)
+        set_widget_font_size(self.act_browse_mode, offset=2)
+        set_widget_font_size(self.act_attention_imgs_only, offset=2)
+        set_widget_font_size(self.act_quick_label_mode, offset=2)
+        
+        
+        set_widget_font_size(self.label_brush_size, offset=2)
+        for a in self.act_group_brush_cate.actions():
+            set_widget_font_size(a, offset=2)
+        for a in self.act_group_brushes.actions():
+            set_widget_font_size(a, offset=2)
+
 
         # icon = QPixmap(10,10)
         # icon.fill(self.seg_colours[0])
@@ -318,7 +386,7 @@ class MainWindow(QMainWindow):
         # self.act_set_thumbnail_dir = QAction("Set the folder of icons", self, triggered=self.open_thumbnail_dir)
 
         self.act_save = QAction("&Save", self , shortcut="Ctrl+S", triggered=self.save_annotations)
-        self.act_save_as = QAction("Save as", self, triggered=self.save_as)
+        self.act_save_as = QAction("Save As", self, triggered=self.save_as)
 
         self.act_import_csv = QAction("Import as csv", self, triggered=self.import_csv)
         self.act_import_seg = QAction("Import Segmentation", self, triggered=lambda: self.import_csv("seg"))
@@ -329,20 +397,20 @@ class MainWindow(QMainWindow):
         
         self.act_export_csv_pt = QAction("Export Point", self, triggered=lambda: self.export_csv("point"))
         self.act_export_csv_seg = QAction("Export Segmentation", self, triggered=lambda: self.export_csv("seg"))
-        self.act_export_mask = QAction("Export Segmentation as images", self, triggered=self.export_mask)
+        self.act_export_mask = QAction("Export Segmentation as Images", self, triggered=self.export_mask)
 
         self.act_exit = QAction("E&xit", self, shortcut="Ctrl+Q", triggered=self.close)
 
         self.act_undo = QAction("&Undo",self, shortcut="Ctrl+Z", triggered=self.undo)
 
         self.act_browse_mode = QAction("Review Mode", self, shortcut="Ctrl+b", triggered=self.toggle_review_mode, checkable=True)
-        self.act_quick_label_mode = QAction("Quick label", self, triggered=self.toggle_quick_label_mode, checkable=True)
+        self.act_quick_label_mode = QAction("Fast Labelling", self, triggered=self.toggle_quick_label_mode, checkable=True)
 
         # self.act_point_mode = QAction("Pts", self, triggered=self.toggle_point_mode, checkable=True)
         # self.act_outline_mode = QAction("outline", self, triggered=self.toggle_seg_mode, checkable=True)
 
         self.act_point_mode = QAction("Point", self,  checkable=True)
-        self.act_outline_mode = QAction("Seg", self, checkable=True)
+        self.act_outline_mode = QAction("Segmentation", self, checkable=True)
         self.act_view_mode = QAction("View", self,  checkable=True, checked = True)
 
         self.act_group_modes = QActionGroup(self)
@@ -352,7 +420,7 @@ class MainWindow(QMainWindow):
         self.act_group_modes.addAction(self.act_point_mode)
         self.act_group_modes.addAction(self.act_outline_mode)
 
-        self.act_attention_imgs_only = QAction("Show Flag Images", self, triggered=self.toggle_flag_img, checkable=True)
+        self.act_attention_imgs_only = QAction("Show Flagged Images", self, triggered=self.toggle_flag_img, checkable=True)
 
         self.act_delete_point = QAction("Delete point", self, triggered=self.delete_point)
 
@@ -366,10 +434,10 @@ class MainWindow(QMainWindow):
 
         self.act_brush_object.setChecked(True)
 
-        self.act_brush_0 = QAction("Size_0", self, checkable=True)
-        self.act_brush_1 = QAction("Size_1", self, checkable=True)
-        self.act_brush_2 = QAction("Size_2", self, checkable=True)
-        self.act_brush_3 = QAction("Size_3", self, checkable=True)
+        self.act_brush_0 = QAction("S", self, checkable=True)
+        self.act_brush_1 = QAction("M", self, checkable=True)
+        self.act_brush_2 = QAction("L", self, checkable=True)
+        self.act_brush_3 = QAction("XL", self, checkable=True)
 
         self.act_brush_1.setChecked(True)
 
@@ -391,6 +459,8 @@ class MainWindow(QMainWindow):
         """Init the menu and add actions to menu
         """
         # File part
+
+        
         self.menu_file = QMenu("&File", self)
         self.menu_file.addAction(self.act_opendir)
         self.menu_file.addAction(self.act_open_annotations)
@@ -411,6 +481,8 @@ class MainWindow(QMainWindow):
         self.menu_file.addAction(self.act_export_mask)
         self.menu_file.addSeparator()
         self.menu_file.addAction(self.act_exit)
+
+
 
         self.menuBar().addMenu(self.menu_file)
 
@@ -433,6 +505,8 @@ class MainWindow(QMainWindow):
 
         self.menuBar().addMenu(self.menu_view)
 
+  
+
         #
         # self.menu_tool = QMenu("&Tool", self)
         # self.menu_tool.addAction(self.act_sort_file_names)
@@ -451,6 +525,8 @@ class MainWindow(QMainWindow):
         self.toolbar_outline =QToolBar("Outline")
         self.toolbar_outline.addActions(self.act_group_brush_cate.actions())
         self.toolbar_outline.addSeparator()
+        self.label_brush_size = QLabel("Brush Size:")
+        self.toolbar_outline.addWidget(self.label_brush_size )
         self.toolbar_outline.addActions(self.act_group_brushes.actions())
 
         self.toolbar_outline.hide()
@@ -458,6 +534,8 @@ class MainWindow(QMainWindow):
         self.addToolBarBreak()
         self.addToolBar(Qt.TopToolBarArea, self.toolbar_outline)
         
+
+
         
     def opendir(self, _value=False, dirpath=None):
         """Open the directory of images
@@ -515,7 +593,7 @@ class MainWindow(QMainWindow):
                     _, extension = os.path.splitext(file_name)
                     if extension == ".json":
                         self.data.set_file_name(file_name)
-                        self.data.set_changed(False)
+                        self.data.changed = False
 
 
                     # if self.data.work_dir is None:
@@ -526,6 +604,10 @@ class MainWindow(QMainWindow):
                     # self.widget_browser.reset_widget()
                     self.list_review_assist()
                     self.list_file_names()
+                    self.data.changed=False
+                    
+                    self.widget_annotation.reset_mask()
+                    self.widget_annotation.update()
 
         except Exception as e:
             print(e)
@@ -546,7 +628,7 @@ class MainWindow(QMainWindow):
         # self.list_properties()
         self.widget_annotation.update()
     def save_annotations(self):
-        """ Save file
+        """ Save the annotation progress as a .json file. 
         triggered by act_save
         
         :return:
@@ -570,19 +652,21 @@ class MainWindow(QMainWindow):
 
         try:
             if self.data.has_anno_file:
+                self.data.write_json()
+            else:
                 self.save_as()
-                self.data.has_anno_file = False
+
 
 
             # Save the new data into the same name
-            self.data.write_json()
+            
             # self.widget_anno_file_label.setText("Annotation file: {}".format(self.data.file_name))
         except Exception as e:
             print(e)
             
             
     def save_as(self):
-        """save file as
+        """Save as the annotation progress as a .json file. A folder and name need to be specific.
         triggered by act_save_as
         """
     
@@ -633,7 +717,7 @@ class MainWindow(QMainWindow):
                             self.data.import_segs(df_data)
                         # self.show_input_csv_detail(df_data)
 
-
+                self.data.changed=True
                 self.list_review_assist()
                 self.list_file_names()
 
@@ -658,6 +742,7 @@ class MainWindow(QMainWindow):
             QMessageBox.about(self, "No image data", "Please select a directory for your images.")
         else:
             try:
+                self.message_unsave()
                 assert len(self.data.seg_names) == 0, "The dataset has already had segmentation, please reload the dataset and import segmentation again"
                 defaultOpenDirPath = os.path.dirname(self.file_path) if self.file_path else '.'  
                 dir = (QFileDialog.getExistingDirectory(self,
@@ -673,6 +758,7 @@ class MainWindow(QMainWindow):
     
                     self.list_review_assist()
                     self.list_file_names()
+                    self.data.changed=True
 
             except Exception as e:           
                 QMessageBox.warning(self,"Warning" , str(e))
@@ -691,7 +777,14 @@ class MainWindow(QMainWindow):
                 return False
         except:
             return False
+        
     def show_input_csv_detail(self,df):
+        """Currently deprecated
+        Show the columns of csv, and let users to select columns for points, segmentation and properties.
+
+        Args:
+            df (_type_): data frame from CSV
+        """
         print(df.columns)
 
         self.csv_window = QMainWindow()
@@ -758,6 +851,9 @@ class MainWindow(QMainWindow):
         # self.csv_widget.set
 
     def set_csv_cols(self):
+        """Currently deprecated
+        Import csv to self.data
+        """
         coord_cols = []
         outline_cols =[]
         prop_cols =[]
@@ -776,10 +872,8 @@ class MainWindow(QMainWindow):
                 prop_cols.append(col)
         self.csv_window.close()
 
-
-
         self.data.set_file_name_csv(self.file_name_temp_for_csv, id_col,coord_cols,outline_cols,prop_cols )
-        self.data.set_changed(False)
+        self.data.changed =False
 
 
         if self.data.work_dir is None:
@@ -1033,7 +1127,7 @@ class MainWindow(QMainWindow):
 
         # Create props table
         if self.data.has_points_current_image():
-            pt_props = self.data.get_current_image().get_curent_pt_props_dict()
+            pt_props = self.data.get_current_image().get_current_pt_props_dict()
             self.widget_props_table.setRowCount(len(pt_props.keys()))
             self.widget_props_table.setVerticalHeaderLabels(pt_props.keys())
             for idx,prop in enumerate(pt_props):
@@ -1085,7 +1179,7 @@ class MainWindow(QMainWindow):
 
     def file_list_current_item_changed(self,row):
         """Detect whether the current image in the file list changed.
-        Auto add segmentation classes if quick label mode is enabled
+        Auto add segmentation classes if Fast labelling mode is enabled
         """
         if row !=-1:
             idx = row
@@ -1173,7 +1267,7 @@ class MainWindow(QMainWindow):
 
 
     def toggle_quick_label_mode(self):
-        """Toggle the mode of whether users can quick label every images
+        """Toggle the mode of whether users can Fast Labelling every images
         Points: Click and label points based on the existed points
         Segmentation: seg classes are generated for all images
         """        
@@ -1184,16 +1278,16 @@ class MainWindow(QMainWindow):
                 self.current_quick_segs = [item.text() for item in iter_all_list_items(self.widget_segment_list)]
                 cur_seg_str = "\n".join(["{}.{}".format(idx+1, name) for idx, name in enumerate(self.current_quick_segs)])
 
-                reply = QMessageBox.question(self, "Enable quick label?",
+                reply = QMessageBox.question(self, "Enable Fast Labelling?",
                                              "The points and Segmentation of the selected image will be used as the annotation guideline.\n\n"\
                                                  "Points:\n{}\n\nSegmentation:\n{}\n".format(cur_pt_str,cur_seg_str),
                               QMessageBox.Yes |QMessageBox.No)
 
                 if reply == QMessageBox.Yes:
-                    ## start the quick label
+                    ## start the Fast Labelling
                     self.widget_quick_label.setVisible(True)
                     # self.info_dock.setVisible(True)
-                    self.label_quick_pt.setText("Predefined labels\n\nPoints:\n"+cur_pt_str)
+                    self.label_quick_pt.setText("Points:\n"+cur_pt_str)
                     self.label_quick_seg.setText("Segmentations:\n"+cur_seg_str)
                     #  +"\nNote: These segmentation classes are automatically added to images without any segmentaions."
                 else:
@@ -1234,10 +1328,10 @@ class MainWindow(QMainWindow):
             self.widget_stack.setCurrentWidget(self.widget_browser)
             self.widget_browser.prepare_images()
             toggle_review_mode_UI(on = False)
-            # self.property_dock.setVisible(False)
+            self.property_dock.setVisible(False)
         else:
             self.widget_stack.setCurrentWidget(self.scroll_area)
-            # self.property_dock.setVisible(True)
+            self.property_dock.setVisible(True)
             toggle_review_mode_UI(on = True)
 
 
@@ -1309,12 +1403,14 @@ class MainWindow(QMainWindow):
     def delete_point(self):
         """
         Action after click delete point
+        call self.data.remove_pt_for_current_img(idx) to remove a point
         :return:
         """
-        if self.widget_segment_list.currentItem() is not None:
+        if self.widget_point_list.currentItem() is not None:
             self.data.remove_pt_for_current_img(self.widget_point_list.currentItem().text())
             self.list_point_name()
             self.list_properties()
+            self.widget_annotation.update()
 
 
     def auto_fill(self):
@@ -1358,8 +1454,8 @@ class MainWindow(QMainWindow):
 
 
     def message_unsave(self):
-        """
-        Message box of saving changes
+        """ Message box of saving changes
+        By checking the self.data.changed
         :return: save, no cancel,  False for no data.
         """
 
@@ -1381,17 +1477,7 @@ class MainWindow(QMainWindow):
         elif reply == QMessageBox.Cancel:
             event.ignore()
 
-    def menu_point_list(self,position):
-        """
-        Context menu (right click on the point panel) for point list.
-        :param position:
-        :return:
-        """
-        if self.widget_point_list.count() != 0:
-            menu = QMenu()
-            self.act_delete_point.setText("Delete {}".format(self.widget_point_list.currentItem().text()))
-            menu.addAction(self.act_delete_point)
-            menu.exec_(self.widget_point_list.viewport().mapToGlobal(position))
+
 
 
     def update_file_label(self, changed):
@@ -1477,8 +1563,17 @@ class MainWindow(QMainWindow):
 
         self.widget_annotation.update()
 
-
-
+    def menu_point_list(self,position):
+        """Currently deprecated
+        Context menu (right click on the point panel) for point list.
+        :param position:
+        :return:
+        """
+        if self.widget_point_list.count() != 0:
+            menu = QMenu()
+            self.act_delete_point.setText("Delete {}".format(self.widget_point_list.currentItem().text()))
+            menu.addAction(self.act_delete_point)
+            menu.exec_(self.widget_point_list.viewport().mapToGlobal(position))
 
 
 
@@ -1486,5 +1581,8 @@ if __name__ == '__main__':
 
 
     app = QApplication(sys.argv)
+    # app.setStyleSheet("QToolBar{Point-Size: 18pt;}")
+    
     ex = MainWindow()
+    
     sys.exit(app.exec_())
