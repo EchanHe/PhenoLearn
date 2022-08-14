@@ -16,7 +16,7 @@ from shutil import copyfile
 from math import nan, isnan
 
 
-from relabelData import Data_gui
+from label_data import Data_gui
 
 
 
