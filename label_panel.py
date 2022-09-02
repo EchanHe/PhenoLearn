@@ -7,7 +7,7 @@ from PyQt5.QtGui import *
 from PyQt5.QtCore import *
 import sys,os
 import numpy as np
-import relabelData
+import label_data
 import cv2
 
 # class Communicate(QObject):
@@ -89,7 +89,7 @@ class LabelPanel(QWidget):
         file_name = 'data/data_file.json'
         work_dir = './data/'
 
-        self.data = relabelData.Data(file_name,work_dir)
+        self.data = label_data.Data(file_name,work_dir)
 
         # self.state_browse = True
 

@@ -24,7 +24,7 @@ def transfer_df_to_json(df, pt_only, seg_only):
         temp = dict()
         temp['file_name'] = row[id_col]
         temp['points'] = []
-        temp['outlines_cv'] = {}
+        temp['segmentations'] = {}
         for col in coord_cols:
             # POint detail
             point = dict()
@@ -39,8 +39,8 @@ def transfer_df_to_json(df, pt_only, seg_only):
 
         for col in outline_cols:
             # POint detail
-            temp['outlines_cv'][col] ={}
-            temp['outlines_cv'][col]["contours"] = eval(row[col])
+            temp['segmentations'][col] ={}
+            temp['segmentations'][col]["contours"] = eval(row[col])
 
 
         data.append(temp)
@@ -58,7 +58,7 @@ def transfer_df_to_json_by_cols(df, id_col = 'file',coord_cols=[], outline_cols=
         temp = dict()
         temp['file_name'] = row[id_col]
         temp['points'] = []
-        temp['outlines_cv'] = {}
+        temp['segmentations'] = {}
         temp['property'] = {}
         for col in coord_cols:
             # POint detail
@@ -75,11 +75,11 @@ def transfer_df_to_json_by_cols(df, id_col = 'file',coord_cols=[], outline_cols=
 
         for col in outline_cols:
             # POint detail
-            temp['outlines_cv'][col] ={}
+            temp['segmentations'][col] ={}
             try:
-                temp['outlines_cv'][col]["contours"] = eval(row[col])
+                temp['segmentations'][col]["contours"] = eval(row[col])
             except:
-                temp['outlines_cv'][col]["contours"] = []
+                temp['segmentations'][col]["contours"] = []
 
         for col in prop_cols:
             temp['property'][col] = row[col]
@@ -93,30 +93,7 @@ def add_to_dict(df_dict,key,value):
     else:
         df_dict[key] = [value]
 
-def transfer_json_to_df(data, pt_only, seg_only):
-    df_dict={}
-    df = pd.DataFrame()
-    for entry in data:
-        file_name = entry['file_name']
 
-        points = entry.get('points', None)
-        segs = entry.get("outlines_cv" , None)
-
-        if points and pt_only:
-            for pt in points:
-                df.loc[file_name,pt['name']+'_x'] = pt['x']
-                df.loc[file_name,pt['name']+'_y'] = pt['y']
-
-        if segs and seg_only:
-            for key, seg in segs.items():
-                df.loc[file_name,key] = str(seg['contours'])
-
-
-    # df = pd.DataFrame(df_dict)
-    df.index.name = 'file'
-    df = df.reset_index()
-
-    return df
 def write_seg_result(df_valid, pred_contours,path, data_cols, write_json=False):
     df_file_names = df_valid.drop(data_cols , axis=1 , errors = 'ignore')
     df_file_names = df_file_names.reset_index(drop=True)
@@ -297,7 +274,7 @@ def transfer_json_to_df_by_cols(data, coord_cols =False, outline_cols=False, pro
         file_name = entry['file_name']
 
         points = entry.get('points', None)
-        segs = entry.get("outlines_cv" , None)
+        segs = entry.get("segmentations" , None)
         props = entry.get("property")
 
         df.loc[id_row , 'file'] =  file_name
@@ -328,6 +305,42 @@ def transfer_json_to_df_by_cols(data, coord_cols =False, outline_cols=False, pro
                         df.loc[id_row, "prop_" + key] = str(prop)
                     else:
                         df.loc[id_row, prop_cols[idx]] = str(prop)
+    return df
+
+
+def transfer_json_to_df(data, pt_only, seg_only):
+    """deprecated
+
+    Args:
+        data (_type_): _description_
+        pt_only (_type_): _description_
+        seg_only (_type_): _description_
+
+    Returns:
+        _type_: _description_
+    """
+    df_dict={}
+    df = pd.DataFrame()
+    for entry in data:
+        file_name = entry['file_name']
+
+        points = entry.get('points', None)
+        segs = entry.get("segmentations" , None)
+
+        if points and pt_only:
+            for pt in points:
+                df.loc[file_name,pt['name']+'_x'] = pt['x']
+                df.loc[file_name,pt['name']+'_y'] = pt['y']
+
+        if segs and seg_only:
+            for key, seg in segs.items():
+                df.loc[file_name,key] = str(seg['contours'])
+
+
+    # df = pd.DataFrame(df_dict)
+    df.index.name = 'file'
+    df = df.reset_index()
+
     return df
 
 if __name__ == "__main__":    # train(anno_file="input_dir/pt.csv",img_dir="input_dir/",

@@ -496,7 +496,7 @@ class Data():
                 image = Image(entry['file_name'] ,
                     entry.get('points', None),
                     entry.get('outlines', None),
-                    entry.get("outlines_cv" , None),
+                    entry.get("segmentations" , None),
                     entry.get("property", None)
                 )
                 #self.images.append(image)
@@ -507,7 +507,7 @@ class Data():
                     self.pt_names.add(pt['name'])
                     
                 #Update seg name for all seg
-                for key,_ in entry.get("outlines_cv", {}).items():
+                for key,_ in entry.get("segmentations", {}).items():
                     self.seg_names.add(key)
 
                 #Update outline names
@@ -546,6 +546,9 @@ class Data():
                         
     def import_segs(self, df):
         """Read the dataframe(csv) and assign segmentation to images
+        
+        Args:
+            df (_type_): Import csv dataframe
         """        
         for idx, row in df.iterrows():
             seg_dict={}
@@ -559,9 +562,37 @@ class Data():
                         # seg_dict[col]["contours"] = eval(row[col])
 
 
-            self.images[idx].segments_cv = seg_dict
+                self.images[idx].segments_cv = seg_dict
+                self.seg_names.add(col)
+
+    def import_pts(self, df):
+        """Read the dataframe(csv) and assign points to images
+
+        Args:
+            df (_type_): Import csv dataframe
+        """
+        
+        cols = df.columns
+        col_names = [col.split("_")[0] for col in cols]
+        col_names = pd.unique(col_names)
+        
+        for idx, row in df.iterrows():
             
-            self.seg_names.add(col)
+            #if the file name appear in the dataset directory
+            if idx in self.images:
+                for col_name in col_names:
+                    pt_name = col_name
+                    x= row[col_name+"_x"]
+                    y = row[col_name+"_y"]
+                    if x ==-1 or y == -1:
+                        absence= True
+                    else:
+                        absence = False
+  
+                    self.images[idx].points_dict[pt_name]= Point(pt_name,x, y,absence=absence)   
+                    self.images[idx].set_current_pt_key_to_start()
+                    self.pt_names.add(pt_name)
+
 
     def sort(self, value):
         if value == True:
@@ -1160,7 +1191,7 @@ class Data():
 
 
 
-            entry['outlines_cv'] = image.segments_cv
+            entry['segmentations'] = image.segments_cv
 
             entry['property'] = image.property
 

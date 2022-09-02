@@ -382,13 +382,15 @@ class MainWindow(QMainWindow):
         """Init and create actions for event
         """
         self.act_opendir = QAction("&Open Image Directory", self, triggered=self.opendir)
-        self.act_open_annotations = QAction("Open &Annotation File", self, triggered=self.open_annotations)
+        self.act_open_annotations = QAction("Open &Labelling Progress", self, triggered=self.open_annotations)
         # self.act_set_thumbnail_dir = QAction("Set the folder of icons", self, triggered=self.open_thumbnail_dir)
 
         self.act_save = QAction("&Save", self , shortcut="Ctrl+S", triggered=self.save_annotations)
         self.act_save_as = QAction("Save As", self, triggered=self.save_as)
 
-        self.act_import_csv = QAction("Import as csv", self, triggered=self.import_csv)
+        # self.act_import_csv = QAction("Import as csv", self, triggered=self.import_csv)
+        
+        self.act_import_csv_pt = QAction("Import Point", self, triggered=lambda: self.import_csv("pt"))
         self.act_import_seg = QAction("Import Segmentation", self, triggered=lambda: self.import_csv("seg"))
         
         self.act_import_props = QAction("Import Properties", self, triggered=lambda: self.import_csv("prop"))
@@ -471,6 +473,7 @@ class MainWindow(QMainWindow):
         self.menu_file.addAction(self.act_save_as)
         
         self.menu_file.addSeparator()
+        self.menu_file.addAction(self.act_import_csv_pt)
         self.menu_file.addAction(self.act_import_seg)
         self.menu_file.addAction(self.act_import_img_props)
         self.menu_file.addAction(self.act_import_props)
@@ -575,7 +578,7 @@ class MainWindow(QMainWindow):
             print(e)
 
     def open_annotations(self):
-        """Open the annotation file.json file.
+        """Open the labelling progress file.json file.
 
         """
         try:
@@ -583,10 +586,11 @@ class MainWindow(QMainWindow):
             if self.data.work_dir==None:
                 QMessageBox.about(self, "No image data", "Please select a directory for your images.")
             else:
+                defaultOpenDirPath = os.path.dirname('.')
                 self.message_unsave()
                 options = QFileDialog.Options()
                 # fileName = QFileDialog.getOpenFileName(self, "Open File", QDir.currentPath())
-                file_name, _ = QFileDialog.getOpenFileName(self, 'Open Annotations', '.',
+                file_name, _ = QFileDialog.getOpenFileName(self, 'Open Labelling Progress', defaultOpenDirPath,
                                                         'Files (*.json)', options=options)
                 if file_name:
                     file_name = os.path.abspath(file_name)
@@ -594,7 +598,8 @@ class MainWindow(QMainWindow):
                     if extension == ".json":
                         self.data.set_file_name(file_name)
                         self.data.changed = False
-
+                        self.list_review_assist()
+                        self.list_file_names()
 
                     # if self.data.work_dir is None:
                     #     self.widget_folder_label.setText("Image Dir: {}\nAnnotation file: {}".format("",os.path.abspath(self.data.file_name)))
@@ -602,12 +607,12 @@ class MainWindow(QMainWindow):
                     #     self.widget_folder_label.setText("Image Dir: {}\nAnnotation file: {}".format(os.path.abspath(self.data.work_dir),os.path.abspath(self.data.file_name)))
 
                     # self.widget_browser.reset_widget()
-                    self.list_review_assist()
-                    self.list_file_names()
-                    self.data.changed=False
+
+             
                     
-                    self.widget_annotation.reset_mask()
-                    self.widget_annotation.update()
+
+
+                    # self.widget_annotation.update()
 
         except Exception as e:
             print(e)
@@ -715,11 +720,16 @@ class MainWindow(QMainWindow):
                         
                         if mode=="seg":
                             self.data.import_segs(df_data)
+                            
+                        if mode=="pt":
+                            self.data.import_pts(df_data)
+                            
+                        # deprecated function     
                         # self.show_input_csv_detail(df_data)
 
-                self.data.changed=True
-                self.list_review_assist()
-                self.list_file_names()
+                    self.data.changed=True
+                    self.list_review_assist()
+                    self.list_file_names()
 
         except Exception as e:
             print(e)
