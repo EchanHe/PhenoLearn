@@ -178,9 +178,9 @@ class Point():
 
     def set_rect(self,cx,cy,width,height):
 
-        x = cx - width//2
-        y = cy - height//2
-        self.rect = QRect(x, y, width, height)
+        x = int(cx - width//2)
+        y = int(cy - height//2)
+        self.rect = QRect(x, y, int(width), int(height))
 
     def check_diff(self, pt_name = None,x= None,y=None, width = None, error = None,info = None, absence = None):
         cond_name = pt_name is not None and pt_name != self.pt_name

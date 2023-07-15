@@ -348,8 +348,8 @@ class LabelPanel(QWidget):
         # painter.drawEllipse(bbox.center(), TEMP_SHAPE_LENGTH/2 * 1/self.scale, TEMP_SHAPE_LENGTH/2 * 1/self.scale)
         painter.drawEllipse(bbox.center(), bbox.width()//2, bbox.height()//2)
        
-        painter.drawText(bbox.center().x() - font_size.width(name)/2,
-                    bbox.center().y() - font_size.height()/2,
+        painter.drawText(bbox.center().x() - font_size.width(name)//2,
+                    bbox.center().y() - font_size.height()//2,
                     name)
 
 
