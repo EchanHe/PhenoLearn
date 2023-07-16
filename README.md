@@ -113,11 +113,11 @@ PhenoLearn provides an intuitive interface to easily label images for Deep Learn
 #### **Open a project**
 
 Click on the `Open Dir` in the `File menu` to select a directory containing the images to be labeled.
-![Main view](./assets/open_1_1.png)
+![open 2](./assets/open_1_1.png)
 
 
 After selecting the directory, PhenoLearn will display all the images in the selected folder in the File panel
-![Main view](./assets/opened_1.png)
+![open 2](./assets/opened_1.png)
 
 Click on an image to display it in the Main panel. Here, you can inspect the image and zoom in or out using functions in `View menu`, or use Ctrl mouse wheels. The coordinates and RGB value of your current mouse location are displayed in bottom right
 
@@ -126,30 +126,30 @@ Click on an image to display it in the Main panel. Here, you can inspect the ima
 #### **Placing points**
 
 Activate the Point button in the Toolbar.
-![Main view](./assets/point_1.png)
+![p1](./assets/point_1.png)
 
 \
 Left-click on the image in the Main panel to place a point.
 A pop-up dialog will appear, allowing you to name the point. You can either enter a new name or select an used name from the dropdown menu. 
 
 You can view, edit, and delete existing points in the Annotation panel.
-![Main view](./assets/place_point_1.png)
+![pt1](./assets/place_point_1.png)
 
 <br />
 
 #### **Placing segmentations**
 
 Toggle the Segmentation button in the Toolbar. A Segmentation Toolbar will appear below the main toolbar.
-![Main view](./assets/seg.png)
+![seg](./assets/seg.png)
 
 Define segmentation classes by selecting the Segmentation tab in the Annotation panel and clicking the Add button.
-![Main view](./assets/seg_add.png)
+![seg add](./assets/seg_add.png)
 
 To segment an image, select a segmentation class and activate the Draw button in the Segmentation Toolbar. Left-click and hold to segment, which will be colored based on the color assigned.
-![Main view](./assets/seg_1.png)
+![seg 1](./assets/seg_1.png)
 
 For larger regions, draw a closed outline and click Auto Fill in the Segmentation Toolbar to fill the area inside the outline.
-![Main view](./assets/seg_2.png)
+![seg 2](./assets/seg_2.png)
 
 Activate the Erase button and erase over the incorrectly segmented area.
 
@@ -161,7 +161,7 @@ If you often place the same labels across multiple images, PhenoLearn's Fast Lab
 
 Click `Fast Labelling` in the `Toolbar`. PhenoLearn will use the annotations from the current image as pre-defined annotations for subsequent images. (Note that labels must be placed in the same order to ensure accuracy).
 
-![Main view](./assets/fast_label.png)
+![fast_label](./assets/fast_label.png)
 
 <br />
 
@@ -190,7 +190,7 @@ PhenoLearn supports exporting annotations in CSV files (both point and segmentat
 
 In the Train tab. There are settings you need to define here:
 
-![Train view](./assets/Train.PNG)
+![Train view](./assets/train.png)
 
 | Setting | Description |
 | --- | --- |
@@ -213,7 +213,7 @@ Click `Train` to start training. Once completed, a .pth file will be saved in th
 #### **Model Prediction**
 
 In the Predict tab. There are settings you need to define here:
-![Predict view](./assets/Predict.PNG)
+![Predict view](./assets/predict.png)
 
 
 | Setting | Description |
@@ -254,14 +254,14 @@ After importing, PhenoLearn will visualize the predictions for reviewing
 The `Review Mode` allows users to quickly skim through predictions and flag any inaccuracies.
 
 Activate the `Review Mode` in `Toolbar`. PhenoLearn will display multiple thumbnails of images along with their annotations.
-![Main view](./assets/review_mode.png)
+![Review mode](./assets/review_mode.png)
 
 
 As you skim through the results, tick the checkboxes next to the thumbnails of images with incorrect predictions.
 
 After you've reviewed the images, click the Show Flagged Images button to display only the images you flagged.
 
-![Main view](./assets/review_mode_1.png)
+![Review mode 2](./assets/review_mode_1.png)
 
 Toggle `Show Flagged Images` in `Toolbar` to only filter the flagged images. And un-toggle `Review Mode` to edit them
 
@@ -276,7 +276,7 @@ Import properties using the `Import Properties` in `File menu`.
 - Numerical properties can be used for sorting
 - Categorical properties can be used for filtering 
 
-![Main view](./assets/review_assit.PNG)
+![Review Assistant](./assets/review_assit.PNG)
 
 
 
