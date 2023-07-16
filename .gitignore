@@ -1,7 +1,5 @@
-__pycache__/browse_panel.cpython-37.pyc
-__pycache__/label_panel.cpython-37.pyc
-__pycache__/relabelData.cpython-37.pyc
-util/__pycache__/phenolearn_io.cpython-37.pyc
+*.pyc
+
 data/shell_10/continue - Copy.json
 data/shell_10/continue_meta.json
 data/shell_10/continue.json

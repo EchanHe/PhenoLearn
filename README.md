@@ -5,6 +5,7 @@
 ## Table of Contents
 -   [Features](#features)
 -   [Installation](#installation)
+-   [Get demo datasets](#get-demo-datasets)
 -   [Usage](https://chat.openai.com/?model=gpt-4#usage)
 -   [License](#license)
 -   [Contact](#contact)  
@@ -93,6 +94,29 @@ or Open the repo using [Visual studio Code](https://code.visualstudio.com/)
 The run the `dl_tool.py` file
 PhenoLearn provides an intuitive interface to easily label images for Deep Learning purposes. The 
 
+
+## Get demo datasets
+
+**1. 10 Bird images**
+
+Location: `./data/bird_10/`\
+A labelling process is located in `./data/bird_10_process.json`. \
+A CSV of bird demo properties is `./data/bird_10_props.csv`
+
+**2. The 220 bird images mentioned in the paper**
+
+120 images are in the `train` folder\
+100 images are in the `pred` folder\
+The segmentation CSV is `seg_100.csv`
+
+
+**3. The 220 *Littorina* images mentioned in the paper**
+
+120 images are in the `train` folder\
+100 images are in the `pred` folder\
+The segmentation CSV is `seg_100.csv`
+
+Both dataset 2 and 3 can be download here: https://zenodo.org/record/8152784
 
 ## Usage
 
@@ -276,7 +300,7 @@ Import properties using the `Import Properties` in `File menu`.
 - Numerical properties can be used for sorting
 - Categorical properties can be used for filtering 
 
-![Review Assistant](./assets/review_assit.PNG)
+![Review Assistant](./assets/review_assit.png)
 
 
 
