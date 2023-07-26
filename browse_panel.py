@@ -245,11 +245,12 @@ class BrowsePanel(QWidget):
                 for key, pt in points_dict.items():
                     if not pt.absence:
                         bbox = pt.rect
-                        painter.drawEllipse(bbox.center()/(scale), point_size.width(), point_size.height())
+                        painter.drawEllipse(int(bbox.center().x()/(scale)),int(bbox.center().y()/(scale)),
+                                            point_size.width(), point_size.height())
                         
                         #get the point name
-                        painter.drawText(bbox.center().x()/(scale) - font_size.width(pt.pt_name)/2,
-                                         bbox.center().y()/(scale) - font_size.height()/2,
+                        painter.drawText(int(bbox.center().x()//(scale) - font_size.width(pt.pt_name)//2),
+                                         int(bbox.center().y()//(scale) - font_size.height()//2),
                                          pt.pt_name)
 
 

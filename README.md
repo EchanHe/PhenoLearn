@@ -1,28 +1,35 @@
 # PhenoLearn
 
-‘PhenoLearn’ (github.com/EchanHe/PhenoLearn) is an open-source image analysis tool that is designed for high-throughput phenotype measuring on digital biodiversity datasets. It can (i) generates annotations (currently points and segmentation) (ii) use deep learning models to train and predict annotations (iii) Review and edit predictions.
+**PhenoLearn** (github.com/EchanHe/PhenoLearn) is an open-source image analysis tool that is designed for high-throughput phenotype measuring on digital biodiversity datasets. It can (i) generates annotations (ii) use deep learning models to generate annotations (iii) Review predictions.
 
 ## Table of Contents
 -   [Features](#features)
 -   [Installation](#installation)
 -   [Get demo datasets](#get-demo-datasets)
--   [Usage](https://chat.openai.com/?model=gpt-4#usage)
+-   [Usage](#usage)
 -   [License](#license)
 -   [Contact](#contact)  
 
 ## Features
 
-PhenoLearn has two parts:
-Label and Deep Learning
+PhenoLearn has two UI tools:
+1. **PhenoLabel**. does the Label and Review
+2. **PhenoTrain**. does the Deep Learning
 
-- Image Labeling: Explain the functionality and benefits of your image labeling feature here.
-- Training Deep Learning Models: Explain the functionality and benefits of your deep learning training feature here.
-- Reviewing Deep Learning Predictions: Explain the functionality and benefits of your prediction reviewing feature here.
-Add more features as needed
+Functions:
+- **Labeling**: Place labels on images, currently supports points and segmentations.
+- **Using Deep Learning**: Train DL models with labelled images, and apply the best model to make predictions.
+- **Review**: Review the predictions, edit incorrect predictions to increase the accuracy
+
+
+PhenoLearn can be used in different workflows
+
+![Main view](./assets/workflow.png)
+
 ## Installation
 Before you start the installation, make sure your system meets the following requirements:
 
--  Python (Verions >=3.6) installed. If you don't have Python installed, you can get it from [Python](https://www.python.org/downloads/) or [Anaconda Python](https://www.anaconda.com/download). We recommend Anaconda Python, as it has Conda included.
+-  Python 3 (Tested Versions: 3.11) installed. If you don't have Python installed, you can get it from [Python](https://www.python.org/downloads/) or [Anaconda Python](https://www.anaconda.com/download). We recommend Anaconda Python, as it has Conda included.
 -   pip (Python Package Installer), which typically comes with the Python installation
 -   Conda, an open-source package management system and environment management system
   
@@ -32,7 +39,7 @@ To install, follow these steps.
 **1. Clone the repo**
  
 ```bash
-git  clone  https://github.com/EchanHe/PhenoLearn.git
+git clone https://github.com/EchanHe/PhenoLearn.git
 ```
 It is recommended to create a virtual environment to avoid mixing up the project dependencies with other projects. You can create a virtual environment using the following command:
 <br />
@@ -41,55 +48,63 @@ It is recommended to create a virtual environment to avoid mixing up the project
 
 ```bash
 conda create --name phenolearn python
-conda activate your_env_name
+conda activate phenolearn
 ```
-For further information about virtual environment you can visit [here](https://conda.io/projects/conda/en/latest/user-guide/tasks/manage-environments.html#activating-an-environment)
+You can also custom your environment. For further information about virtual environment you can visit [here](https://conda.io/projects/conda/en/latest/user-guide/tasks/manage-environments.html#activating-an-environment)
 <br />
 
-**3. install pacakges:**
+**3. Install pacakges:**
 
-When you are in the `PhenoLearn` virtual environment.\
-Here are the packages required for the label part:
+When you are in the `phenolearn` virtual environment, install packages for PhenoLearn.
+
+Required packages for PhenoLabel with tested versions:
 - numpy == 1.25.1
-- pandas >= 2.0.3
-- opencv-python >= 4.8.0.74
+- pandas == 2.0.3
+- opencv-python == 4.8.0.74
 - PyQt == 5.15.9
 
+Other versions may also work, but they have not been tested.\
 Use the `requirements.txt` in the root directory to install
  ```bash
 pip install -r requirements.txt
 ```
+You can also install these packages directly using pip:
+```bash
+pip install numpy==1.25.1 pandas==2.0.3 opencv-python==4.8.0.74 PyQt5==5.15.9
+```
 
+<br />
 
-Besides the packages used above, `PyTorch` is needed for the Deep Learning part
-Depends on whether the device has CUDA or not, you need to install different version of `PyTorch`.
-You can visit [here](https://pytorch.org/get-started/locally/) for how to install `PyTorch`.
+Additional package for PhenoTrain with versions we tested:
+- PyTorch == 2.0.1
+
+Depends on whether the device has CUDA or not, you need to install the correct `PyTorch`. You can visit [the official website](https://pytorch.org/get-started/locally/) for more info on how to install.
 <br />
 
 **4. Run PhenoLearn**
 
-**Label Tool**
-
+#### PhenoLabel
 Navigate to the repository in the terminal and run 
  ```bash
-python label_tool.py
+python phenolabel.py
 ```
 
 Or open the repo using [Visual studio Code](https://code.visualstudio.com/)
-The run the `label_tool.py` file
-PhenoLearn provides an intuitive interface to easily label images for Deep Learning purposes. The window when PhenoLearn starts![Main view](./assets/main.png)
+The run the `phenolabel.py` file
+PhenoLearn provides an intuitive interface to easily label images for Deep Learning purposes.\
+ The window when PhenoLabel starts![Main view](./assets/main.png)
+<br />
 
-
-**Deep Learning tool**
-
+#### PhenoTrain
 Navigate to the repository in the terminal and run 
  ```bash
-python dl_tool.py
+python phenotrain.py
 ```
 
 Or open the repo using [Visual studio Code](https://code.visualstudio.com/)
-The run the `dl_tool.py` file
-PhenoLearn provides an intuitive interface to easily label images for Deep Learning purposes. The 
+The run the `phenotrain.py` file
+PhenoTrain provides an intuitive interface for using Deep Learning.\
+The window when PhenoTrain starts![Main view](./assets/train.png)
 
 
 ## Get demo datasets
@@ -118,11 +133,12 @@ Both dataset 2 and 3 can be download here: https://zenodo.org/record/8152784
 ## Usage
 
 
--   [Image Labeling](#image-labeling)
--   [Using Deep Learning](#using-deep-learning)
--   [Reviewing Predictions](#reviewing-predictions)
+-   [Label Image](#label-image)
+-   [Use Deep Learning](#use-deep-learning)
+-   [Review Predictions](#review-predictions)
 
-### **Image Labeling**
+### **Label Image**
+This part uses [PhenoLabel](#phenolabel)
 
 -   [Open a project](#open-a-project)
 -   [Placing points](#placing-points)
@@ -139,23 +155,19 @@ Click on the `Open Dir` in the `File menu` to select a directory containing the 
 After selecting the directory, PhenoLearn will display all the images in the selected folder in the File panel
 ![open 2](./assets/opened_1.png)
 
-Click on an image to display it in the Main panel. Here, you can inspect the image and zoom in or out using functions in `View menu`, or use Ctrl mouse wheels. The coordinates and RGB value of your current mouse location are displayed in bottom right
+Click on an image to display it in the Main panel. Here, you can inspect the image and zoom in or out using functions in `View menu`, or use Ctrl mouse wheels. The coordinates and RGB value of the current mouse location are displayed in bottom right
 <br />
 
 #### **Placing points**
 
 Activate the Point button in the Toolbar.
-
 ![p1](./assets/point_1.png)
 
-\
 Left-click on the image in the Main panel to place a point.
 A pop-up dialog will appear, allowing you to name the point. You can either enter a new name or select an used name from the dropdown menu. 
 
 You can view, edit, and delete existing points in the Annotation panel.
-
 ![pt1](./assets/place_point_1.png)
-
 <br />
 
 #### **Placing segmentations**
@@ -173,17 +185,14 @@ For larger regions, draw a closed outline and click Auto Fill in the Segmentatio
 ![seg 2](./assets/seg_2.png)
 
 Activate the Erase button and erase over the incorrectly segmented area.
-
 <br />
 
 #### **Fast Labelling**
 
-If you often place the same labels across multiple images, PhenoLearn's Fast Labelling feature can help speed up the process.
+If you often place the same labels across multiple images, PhenoLearn's `Fast Labelling` feature can help speed up the process.
 
-Click `Fast Labelling` in the `Toolbar`. PhenoLearn will use the annotations from the current image as pre-defined annotations for subsequent images. (Note that labels must be placed in the same order to ensure accuracy).
-
+Click `Fast Labelling` in the `Toolbar`. It uses the annotations from the current image as pre-defined annotations for subsequent images. (Note that labels must be placed in the same order to ensure accuracy).
 ![fast_label](./assets/fast_label.png)
-
 <br />
 
 #### **Saving and Loading Labeling Progress**
@@ -195,20 +204,19 @@ To continue a previous session, use `Open Labelling Progress` from the `File men
 
 #### **Export labels**
 
-Labels from PhenoLearn can be exported via export functions in `File menu` and used as input for Deep Learning models.\
+Labels from PhenoLearn can be exported via export functions in `File menu` and used as input for Deep Learning models.
+
 PhenoLearn supports exporting annotations in CSV files (both point and segmentation) and black and white masks (only for single-class segmentation).
 <br />
 
-### **Using Deep Learning**
-
+### **Use Deep Learning**
+This part uses [PhenoTrain](#phenotrain)
 -   [Model Training](#model-training)
 -   [Model Prediction](#model-prediction)
 
 #### **Model Training**
 
 In the Train tab. There are settings you need to define here:
-
-![Train view](./assets/train.png)
 
 | Setting | Description |
 | --- | --- |
@@ -230,7 +238,7 @@ Click `Train` to start training. Once completed, a .pth file will be saved in th
 #### **Model Prediction**
 
 In the Predict tab. There are settings you need to define here:
-![Predict view](./assets/predict.png)
+<!-- ![Predict view](./assets/predict.png) -->
 
 
 | Setting | Description |
@@ -246,18 +254,18 @@ In the Predict tab. There are settings you need to define here:
 Click `Predict` to start predicting. Once completed, prediction will be saved in `Prediction File Folder`.
 <br />
 
-### **Reviewing Predictions**
-
--   [Importing Predictions](#importing-predictions)
+### **Review Predictions**
+This part uses [PhenoLabel](#phenolabel)
+-   [Import Predictions](#import-predictions)
 -   [Review Mode](#review-mode)
 -   [Review Assistant](#review-assistant)
 <br />
 
-#### **Importing Predictions**
+#### **Import Predictions**
 
-Open an image folder in PhenoLearn, just like in [Image Labeling](#image-labeling).\
-Import your model's predictions into PhenoLearn using the import functions in `File menu`. PhenoLearn can import CSV files and black-and-white masks.\
-After importing, PhenoLearn will visualize the predictions for reviewing
+1. Open an image folder in PhenoLearn, just like in [Image Labeling](#image-labeling).
+2. Import your model's predictions into PhenoLearn using the import functions in `File menu`. PhenoLearn can import CSV files and black-and-white masks.
+3. After importing, PhenoLearn will visualize the predictions for reviewing
 <br />
 
 #### **Review Mode**
@@ -269,7 +277,8 @@ Activate the `Review Mode` in `Toolbar`. PhenoLearn will display multiple thumbn
 ![Review mode](./assets/review_mode.png)
 
 
-As you skim through the results, tick the checkboxes next to the thumbnails of images with incorrect predictions.\
+As you skim through the results, tick the checkboxes next to the thumbnails of images with incorrect predictions.
+
 After you've reviewed the images, click the Show Flagged Images button to display only the images you flagged.
 
 ![Review mode 2](./assets/review_mode_1.png)
