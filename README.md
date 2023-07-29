@@ -75,11 +75,17 @@ pip install numpy==1.25.1 pandas==2.0.3 opencv-python==4.8.0.74 PyQt5==5.15.9
 
 <br />
 
-Additional package for PhenoTrain with versions we tested:
+Additional packages for PhenoTrain with versions we tested:
 - PyTorch == 2.0.1
+- TensorBoard == 2.13.0
 
-Depends on whether the device has CUDA or not, you need to install the correct `PyTorch`. You can visit [the official website](https://pytorch.org/get-started/locally/) for more info on how to install.
+For PyTorch, Depends on whether the device has CUDA or not, you need to install the correct `PyTorch`. You can visit [the official website](https://pytorch.org/get-started/locally/) for more info on how to install.
 <br />
+
+For TensorBoard
+```bash
+pip install TensorBoard==2.13.0
+```
 
 **4. Run PhenoLearn**
 
@@ -234,6 +240,14 @@ In the Train tab. There are settings you need to define here:
 
 Click `Train` to start training. Once completed, a .pth file will be saved in the `saved_model` folder of the PhenoLearnDL root directory.
 <br />
+
+The training logs can be viewed in [TensorBoard](https://pytorch.org/tutorials/recipes/recipes/tensorboard_with_pytorch.html). They are saved in the `runs` folder. Run the command.
+
+```bash
+tensorboard --logdir==runs
+```
+
+Then visit `http://localhost:6006/` in your browser to view the logs. For detail, you can visit [the tutorial of TensorBoard](https://pytorch.org/tutorials/recipes/recipes/tensorboard_with_pytorch.html).
 
 #### **Model Prediction**
 

@@ -475,6 +475,7 @@ class LabelPanel(QWidget):
 
         if seg == 1:
             # colour = QColor(0, 255, 255, 100)
+            # Draw the segmentation based on contour colour
             colour = self.contour_colour
         else:
             colour = QColor(0, 0, 0, 0)

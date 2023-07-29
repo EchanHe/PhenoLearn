@@ -8,10 +8,17 @@ import sys,os
 import pandas as pd
 
 # sys.path.append('ui/')
-import deeplearning.ui.train_ui as train_ui
-import deeplearning.ui.pred_ui as pred_ui
-import deeplearning.kpt_rcnn
-import deeplearning.deep_lab_seg
+# import deeplearning.ui.train_ui as train_ui
+# import deeplearning.ui.pred_ui as pred_ui
+
+from deeplearning.ui import train_ui 
+from deeplearning.ui import pred_ui
+
+import deeplearning
+from deeplearning import seg_deeplab
+from deeplearning import kpt_rcnn
+# import deeplearning.deep_lab_seg as deep_lab_seg 
+# import deeplearning.kpt_rcnn as kpt_rcnn 
 import time
 
 class progress_widget(QWidget):
@@ -83,10 +90,10 @@ class train_Thread(QThread):
         # try:
         if self.mode=="Segmentation":
             if self.format=="CSV":
-                deep_lab_seg.train(self.img_path, self.scale, self.lr, self.batch,
+                seg_deeplab.train(self.img_path, self.scale, self.lr, self.batch,
                             self.num_epochs,self.test_percent,self.train_lv,self._signal, csv_path=self.csv_path,mask_path=None)
             else:
-                deep_lab_seg.train(self.img_path, self.scale, self.lr, self.batch,
+                seg_deeplab.train(self.img_path, self.scale, self.lr, self.batch,
                             self.num_epochs,self.test_percent,self.train_lv,self._signal, csv_path=None,mask_path=self.mask_path)
         elif self.mode=="Point":
             kpt_rcnn.train(self.csv_path,self.img_path,self.scale,self.lr,self.batch,
@@ -127,7 +134,7 @@ class pred_Thread(QThread):
     def run(self):
         # try:
         if self.mode=="Segmentation":
-            deep_lab_seg.pred(self.csv_path,self.img_path, self.model_path,self.output_dir,
+            seg_deeplab.pred(self.csv_path,self.img_path, self.model_path,self.output_dir,
                         self.format, self.scale,self._signal)
 
         elif self.mode=="Point":
