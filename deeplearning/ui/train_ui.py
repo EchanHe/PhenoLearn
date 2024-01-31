@@ -126,7 +126,7 @@ class Ui_Form(object):
         self.label_9.setText(_translate("Form", "Batch Size"))
         self.comboBox_cate_train.setItemText(0, _translate("Form", "Point"))
         self.comboBox_cate_train.setItemText(1, _translate("Form", "Segmentation"))
-        self.label_7.setText(_translate("Form", "Test Set Percentage"))
+        self.label_7.setText(_translate("Form", "Validation Set Percentage"))
         self.comboBox_train_lv.setItemText(0, _translate("Form", "Minimal"))
         self.comboBox_train_lv.setItemText(1, _translate("Form", "Intermediate"))
         self.comboBox_train_lv.setItemText(2, _translate("Form", "Full"))

@@ -75,6 +75,27 @@ pip install numpy==1.25.1 pandas==2.0.3 opencv-python==4.8.0.74 PyQt5==5.15.9
 
 <br />
 
+**Note**: This error could occur when trying to run PhenoLearn
+```
+QObject::moveToThread: Current thread (<Thread_id>) is not the object's thread (<Thread_id>).
+
+Cannot move to target thread (<Thread_id>)
+
+qt.qpa.plugin: Could not load the Qt platform plugin "xcb" in <path_to_your_environment>/site-packages/cv2/qt/plugins even though it was found.
+
+This application failed to start because no Qt platform plugin could be initialized. Reinstalling the application may fix this problem.
+```
+This error often happens in Linux. Visit [here](https://github.com/NVlabs/instant-ngp/discussions/300) for detailed information about this error.
+
+To solve this, uninstall `opencv-python` and install `opencv-python-headless`
+```
+pip uninstall opencv-python
+pip install opencv-python-headless
+```
+
+
+<br />
+
 Additional packages for PhenoTrain with versions we tested:
 - PyTorch == 2.0.1
 - TensorBoard == 2.13.0
@@ -232,7 +253,7 @@ In the Train tab. There are settings you need to define here:
 | **Image Folder** | The folder of the images. |
 | **Folder of Black and White Masks** | The folder of the masks when `Input Format` is `Mask` |
 | **Image Resize Percentage** | The percentage of resizing the original image <br> Range 1-100% |
-| **Test Set Percentage** | Indicates the percentage of images used in the validation. <br> Default 80/20 |
+| **Validation Set Percentage** | Indicates the percentage of images used in the validation. <br> Default 80/20 |
 | **Batch Size** | The batch size for one iteration of training. |
 | **Training Epochs** | Training length <br> One epoch is defined as one pass of the full training set|
 | **Learning Rate** | Determines how quickly or slowly a neural network model learns a problem. |
@@ -244,7 +265,7 @@ Click `Train` to start training. Once completed, a .pth file will be saved in th
 The training logs can be viewed in [TensorBoard](https://pytorch.org/tutorials/recipes/recipes/tensorboard_with_pytorch.html). They are saved in the `runs` folder. Run the command.
 
 ```bash
-tensorboard --logdir==runs
+tensorboard --logdir runs
 ```
 
 Then visit `http://localhost:6006/` in your browser to view the logs. For detail, you can visit [the tutorial of TensorBoard](https://pytorch.org/tutorials/recipes/recipes/tensorboard_with_pytorch.html).
@@ -273,14 +294,14 @@ This part uses [PhenoLabel](#phenolabel)
 -   [Import Predictions](#import-predictions)
 -   [Review Mode](#review-mode)
 -   [Review Assistant](#review-assistant)
-<br />
+
 
 #### **Import Predictions**
 
 1. Open an image folder in PhenoLearn, just like in [Image Labeling](#image-labeling).
 2. Import your model's predictions into PhenoLearn using the import functions in `File menu`. PhenoLearn can import CSV files and black-and-white masks.
 3. After importing, PhenoLearn will visualize the predictions for reviewing
-<br />
+
 
 #### **Review Mode**
 
@@ -320,5 +341,5 @@ Import properties using the `Import Properties` in `File menu`.
 
 ## Contact
 
-If you have any questions, feel free to reach out to us at csyichenhe@Gmail.com.
+If you have any questions, feel free to reach out to us at csyichenhe@gmail.com.
 Enjoy using PhenoLearn! 

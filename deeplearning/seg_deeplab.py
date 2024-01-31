@@ -298,17 +298,24 @@ def train(img_path,scale, lr, batch,num_epochs, test_percent,train_lv,qt_signal=
     start_time = time.time()
         
     for epoch in range(num_epochs):
+        
+        
         metric_logger = train_one_epoch(model, loss_fn,optimizer, data_loader,None, device, epoch, print_freq=1)
         writer.add_scalar("Loss/train", metric_logger.meters['loss'].total, epoch)
         scheduler.step()
         
-        metric_logger_valid, confmat = evaluate(model, data_loader_test, device, num_classes, loss_fn)
+        metric_logger_valid, confmat, dice_per_class = evaluate(model, data_loader_test, device, num_classes, loss_fn)
         writer.add_scalar("Loss/valid", metric_logger_valid.meters['loss'].total, epoch)
         
-        acc_global, accs, _ = confmat.compute()
-        writer.add_scalar("accuracy/ave", acc_global, epoch)
-        for i_ac, ac in enumerate(accs):
-            writer.add_scalar("accuracy/{}".format(i_ac), ac, epoch)
+        # acc_global, accs, _ = confmat.compute()
+        # writer.add_scalar("accuracy/ave", acc_global, epoch)
+        # for i_ac, ac in enumerate(accs):
+        #     writer.add_scalar("accuracy/{}".format(i_ac), ac, epoch)
+        
+        dice_per_class = torch.mean(dice_per_class,0).detach().cpu().numpy()
+        writer.add_scalar("accuracy/ave", np.mean(dice_per_class), epoch)
+        for i_dice,dice in enumerate(dice_per_class):
+            writer.add_scalar("accuracy/{}".format(i_dice), dice, epoch)
         
         if qt_signal:
             qt_signal.emit(str(epoch)) 

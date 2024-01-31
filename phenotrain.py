@@ -1,4 +1,4 @@
-from winreg import SetValue
+# from winreg import SetValue
 from PyQt5 import QtCore, QtWidgets
 # from PyQt5.QtWidgets import QMainWindow, QWidget, QLabel, QLineEdit
 from PyQt5.QtWidgets import *

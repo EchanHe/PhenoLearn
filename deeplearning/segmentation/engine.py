@@ -61,6 +61,42 @@ def criterion(inputs, target):
 
     return losses["out"] + 0.5 * losses["aux"]
 
+import torch
+
+def dice_score(output, target, eps=1e-7):
+    """
+    Calculate Dice Score for each class and the average Dice Score
+
+    Parameters:
+    output (Tensor): model output (N, C, H, W)
+    target (Tensor): ground truth labels (N, H, W)
+    eps (float): small value to prevent division by zero
+
+    Returns:
+    dice_per_class (Tensor): Dice score per class (C)
+    dice_avg (float): average Dice score
+    """
+
+    # ensure the output is in the same shape with target
+    num_classes = output.shape[1]
+    output = torch.argmax(output, dim=1)
+
+    
+    dice_per_class = torch.zeros(num_classes).to(output.device)
+
+    for i in range(num_classes):
+        true_mask = (target == i)
+        pred_mask = (output == i)
+
+        intersection = (true_mask & pred_mask).sum().float()
+        total = (true_mask | pred_mask).sum().float()
+
+        dice_per_class[i] = (2 * intersection + eps) / (total + eps)
+
+    dice_avg = dice_per_class.mean().item()
+
+    return dice_per_class, dice_avg
+
 
 def evaluate(model, data_loader, device, num_classes, criterion):
     model.eval()
@@ -68,6 +104,10 @@ def evaluate(model, data_loader, device, num_classes, criterion):
     metric_logger = utils.MetricLogger(delimiter="  ")
     header = "Test:"
     num_processed_samples = 0
+    
+    dice_per_class_stack = None
+
+    
     with torch.inference_mode():
         for image, target in metric_logger.log_every(data_loader, 100, header):
             image, target = image.to(device), target.to(device)
@@ -81,6 +121,13 @@ def evaluate(model, data_loader, device, num_classes, criterion):
             # could have been padded in distributed setup
             num_processed_samples += image.shape[0]
 
+            dice_per_class, _ = dice_score(output, target)
+            
+            if dice_per_class_stack is None:
+                dice_per_class_stack = dice_per_class
+            else:
+                dice_per_class_stack = torch.vstack((dice_per_class_stack,dice_per_class))
+            
             metric_logger.update(loss=loss.item())
             
             
@@ -100,7 +147,7 @@ def evaluate(model, data_loader, device, num_classes, criterion):
             "Setting the world size to 1 is always a safe bet."
         )
 
-    return metric_logger, confmat
+    return metric_logger, confmat , dice_per_class_stack
 
 
 def train_one_epoch(model, criterion, optimizer, data_loader, lr_scheduler, device, epoch, print_freq, scaler=None):

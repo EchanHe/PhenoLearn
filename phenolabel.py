@@ -931,6 +931,12 @@ class MainWindow(QMainWindow):
         """    
         if(self.act_outline_mode.isChecked()):
             self.toolbar_outline.show()
+            # change to segmentation tab
+            self.widget_anno_tabs.setCurrentIndex(1)
+
+        elif(self.act_point_mode.isChecked()):
+            self.widget_anno_tabs.setCurrentIndex(0)
+            self.toolbar_outline.hide()
         else:
             self.toolbar_outline.hide()
 
