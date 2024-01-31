@@ -21,7 +21,7 @@ from label_data import Data_gui
 
 
 
-PROGRAM_NAME = 'PhenoLearn'
+PROGRAM_NAME = 'PhenoLabel'
 
 def set_widget_font_size(widget, size=None, offset=None, bold = False):
     """Helper function that sets the widget's font size (setPointSize(size))
