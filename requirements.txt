@@ -2,3 +2,4 @@ numpy==1.25.1
 pandas==2.0.3
 opencv-python==4.8.0.74
 PyQt5==5.15.9
+TensorBoard==2.13.0

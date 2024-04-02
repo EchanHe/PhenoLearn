@@ -46,8 +46,10 @@ It is recommended to create a virtual environment to avoid mixing up the project
 
 **2. Create a new Conda environment and activate it:**
 
+The python version we developed PhenoLearn is 3.10.
+
 ```bash
-conda create --name phenolearn python
+conda create --name phenolearn python=3.10 
 conda activate phenolearn
 ```
 You can also custom your environment. For further information about virtual environment you can visit [here](https://conda.io/projects/conda/en/latest/user-guide/tasks/manage-environments.html#activating-an-environment)
@@ -62,6 +64,7 @@ Required packages for PhenoLabel with tested versions:
 - pandas == 2.0.3
 - opencv-python == 4.8.0.74
 - PyQt == 5.15.9
+- TensorBoard == 2.13.0
 
 Other versions may also work, but they have not been tested.\
 Use the `requirements.txt` in the root directory to install
@@ -70,9 +73,15 @@ pip install -r requirements.txt
 ```
 You can also install these packages directly using pip:
 ```bash
-pip install numpy==1.25.1 pandas==2.0.3 opencv-python==4.8.0.74 PyQt5==5.15.9
+pip install numpy==1.25.1 pandas==2.0.3 opencv-python==4.8.0.74 PyQt5==5.15.9 TensorBoard == 2.13.0
 ```
+<br />
 
+We used PyTorch, a deep learning library, to implement PhenoLearn. 
+
+The initial version was 2.0.1, and we have also tested our work on 2.2.2, which was the latest stable version as of 2024/04/02.
+
+To install PyTorch, it depends on whether your device has a CUDA-supported GPU. You must install the correct version of `PyTorch` accordingly. For detailed installation instructions, please visit [the official website](https://pytorch.org/get-started/locally/). For installing previous versions, visit [here](https://pytorch.org/get-started/previous-versions/).
 <br />
 
 **Note**: This error could occur when trying to run PhenoLearn
@@ -96,17 +105,10 @@ pip install opencv-python-headless
 
 <br />
 
-Additional packages for PhenoTrain with versions we tested:
-- PyTorch == 2.0.1
-- TensorBoard == 2.13.0
 
-For PyTorch, Depends on whether the device has CUDA or not, you need to install the correct `PyTorch`. You can visit [the official website](https://pytorch.org/get-started/locally/) for more info on how to install.
-<br />
 
-For TensorBoard
-```bash
-pip install TensorBoard==2.13.0
-```
+
+
 
 **4. Run PhenoLearn**
 
@@ -138,9 +140,16 @@ The window when PhenoTrain starts![Main view](./assets/train.png)
 
 **1. 10 Bird images**
 
-Location: `./data/bird_10/`\
-A labelling process is located in `./data/bird_10_process.json`. \
-A CSV of bird demo properties is `./data/bird_10_props.csv`
+This dataset is designed for testing PhenoLearn:
+
+Location: `./data/bird_10/`
+- The `bird_10` folder has 10 images. They can be used for labeling and training purposes.
+- `bird_10_process.json` is a saved labeling process file that can be loaded into PhenoLabel.
+- `pts.csv` is a point CSV file. It stores image names in `bird_10/` with three points on them. It can be used in PhenoTrain training
+- `seg.csv` is a segmentation CSV file. It stores image names in `bird_10/` with one segmentation. It can be used in PhenoTrain training
+- The `valid_10` folder has 10 images. They can be used for PhenoTrain prediction.
+- `valid_10_name.csv` provides the filenames for each image in `valid_10/`, useful for PhenoTrain predictions.
+- `valid_10_props.csv` is a demo property file with properties for each image in `valid_10/`, which can be imported into PhenoLabel.
 
 **2. The 220 bird images mentioned in the paper**
 
