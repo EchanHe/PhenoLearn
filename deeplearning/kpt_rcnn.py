@@ -20,7 +20,7 @@ import time
 
 from PIL import Image
 
-
+# for testing __main__ here
 # from detection.engine import train_one_epoch
 # from detection.engine import evaluate
 # from detection import utils
@@ -284,7 +284,7 @@ def get_pred_model(num_kpts):
     
     return model
 
-def train(csv_path,img_path,scale, lr, batch,num_epochs, test_percent,train_lv,qt_signal):
+def train(csv_path,img_path,scale, lr, batch,num_epochs, test_percent,train_lv,qt_signal, hardware_mode="GPU"):
     # initialize writer
     time_date = datetime.datetime.now().strftime("%Y_%m_%d_%H_%M")
     # Create an experiment name
@@ -295,7 +295,11 @@ def train(csv_path,img_path,scale, lr, batch,num_epochs, test_percent,train_lv,q
 
     save_path = "saved_model/point_model_{}.pth".format(time_date)
 
-    device=torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')    
+    if hardware_mode == "GPU":
+        device=torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+    elif hardware_mode == "CPU":
+        # print("using CPU in training")
+        device=torch.device('cpu')  
     if qt_signal:
         qt_signal.emit("Training on: {}".format(device) )
     
@@ -315,24 +319,24 @@ def train(csv_path,img_path,scale, lr, batch,num_epochs, test_percent,train_lv,q
     
     torch.manual_seed(1)
     indices = torch.randperm(len(Dataset)).tolist()
-    dataset = torch.utils.data.Subset(Dataset, indices[:-int(np.ceil(l*test_percent/100))])
+    dataset_train = torch.utils.data.Subset(Dataset, indices[:-int(np.ceil(l*test_percent/100))])
     dataset_test = torch.utils.data.Subset(Dataset, indices[int(-np.ceil(l*test_percent/100)):])
 
     # define training and validation data loaders
 
     data_loader = torch.utils.data.DataLoader(
-        dataset, batch_size=batch, shuffle=True,collate_fn=utils.collate_fn, drop_last=True)
+        dataset_train, batch_size=batch, shuffle=True,collate_fn=utils.collate_fn, drop_last=True)
 
     data_loader_test = torch.utils.data.DataLoader(
         dataset_test, batch_size=1, shuffle=False,collate_fn=utils.collate_fn)    
     
     #The train_lv shows the level of the model what to been trained
     if train_lv == '1':      
-        model=get_model(num_kpts = num_kpts ,train_fpn=False,train_kptHead=2,fine_tune=True)
+        model=get_model(num_kpts = num_kpts ,train_fpn=True,train_kptHead=2,fine_tune=True)
     elif train_lv =='2':
         model=get_model(num_kpts = num_kpts ,train_fpn=True,train_kptHead=4,fine_tune=True)
     elif train_lv=='3':
-        model=get_model(num_kpts = num_kpts ,train_fpn=False,train_kptHead=False,fine_tune=False)
+        model=get_model(num_kpts = num_kpts ,train_fpn=True,train_kptHead=False,fine_tune=False)
         
     model=model.to(device)
     params = [p for p in model.parameters() if p.requires_grad]
@@ -347,15 +351,19 @@ def train(csv_path,img_path,scale, lr, batch,num_epochs, test_percent,train_lv,q
     for epoch in range(num_epochs):
         # train for one epoch, printing every 10 iterations
         metric_logger = train_one_epoch(model, optimizer, data_loader, device, epoch, print_freq=1)
-        writer.add_scalar("Loss/train", metric_logger.meters['loss'].total, epoch)
+        writer.add_scalar("Loss_point/train", metric_logger.meters['loss'].total, epoch)
         # update the learning rate
         lr_scheduler.step()
         
 
         metric_logger_valid , oks_values = evaluate(model, data_loader_test, device)
-        writer.add_scalar("Loss/valid", metric_logger_valid.meters['loss'].value, epoch)    
+        writer.add_scalar("Loss_point/valid", metric_logger_valid.meters['loss'].value, epoch)    
+        
+        oks_values = np.array(oks_values)*scale
         for i_oks , oks_value in enumerate(np.mean(oks_values,0)):
-            writer.add_scalar("accuracy/{}".format(i_oks), oks_value, epoch)
+            writer.add_scalar("accuracy_point/{}".format(i_oks), oks_value, epoch)
+        
+        writer.add_scalar("accuracy_point/ave".format(i_oks), np.mean(oks_values), epoch)
         
         if qt_signal:
             qt_signal.emit(str(epoch)) 
@@ -366,7 +374,7 @@ def train(csv_path,img_path,scale, lr, batch,num_epochs, test_percent,train_lv,q
 
     hours, rem = divmod(end_time-start_time, 3600)
     minutes, seconds = divmod(rem, 60)
-    running_time = "{} {} {}".format(hours, minutes, seconds)
+    running_time = "H:{} M:{} S:{}".format(hours, minutes, seconds)
     print("Running:",running_time)
 
     if qt_signal:    
@@ -374,10 +382,17 @@ def train(csv_path,img_path,scale, lr, batch,num_epochs, test_percent,train_lv,q
    
     torch.save(model, save_path)
 
-def pred(csv_path,img_path, model_path,output_dir, scale,qt_signal):
-    device=torch.device('cuda:0' if torch.cuda.is_available() else 'cpu') 
+def pred(csv_path,img_path, model_path,output_dir, scale,qt_signal, hardware_mode = "GPU"):
+    # device=torch.device('cuda:0' if torch.cuda.is_available() else 'cpu') 
+    if hardware_mode == "GPU":
+        device=torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+    elif hardware_mode == "CPU":
+        # print("using CPU in predicting")
+        device=torch.device('cpu')
     
-    qt_signal.emit("Predicting on: {}".format(device) )
+    if qt_signal:
+        qt_signal.emit("Training on: {}".format(device) )
+    # qt_signal.emit("Predicting on: {}".format(device) )
     
     if not os.path.exists(output_dir):os.makedirs(output_dir)
     time = datetime.datetime.now().strftime("%Y_%m_%d_%H_%M")
@@ -396,42 +411,57 @@ def pred(csv_path,img_path, model_path,output_dir, scale,qt_signal):
     model = model.to(device)
     model.eval()
     out_list=[]
-    for idx, img in enumerate(data_loader_pred):
-        img = img.to(device)
+    with torch.no_grad():
+        for idx, img in enumerate(data_loader_pred):
+            print(f'predicting image: {idx}')
+            img = img.to(device)
 
-        out=model(img)
-        out_list+=out
-        qt_signal.emit(str(idx+1) )
+            out=model(img)
+            out_list+=out
+            if qt_signal:
+                qt_signal.emit(str(idx+1) )
     
     df_out = out_to_csv(df_pred, out_list,scale=scale)
     df_out.to_csv(output_filename)
-    qt_signal.emit("Predicting finish, file is saved as:{}".format(output_filename) )
+    if qt_signal:
+        qt_signal.emit("Predicting finish, file is saved as:{}".format(output_filename) )
 
 if __name__=="__main__":
     
     
     
     #arguments from inputs
-    scale =10
-    device=torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+    scale =5
+    # device=torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     # device=torch.device('cpu')
-    csv_path = "data/pts.csv"
-    img_path = "data/bird_10/"
+    csv_path = "data/littorina_pts/pt_100.csv"
+    img_path = "data/littorina_pts/train/"
+    
+    # csv_path = "data/small_littorina/pt_100.csv"
+    # img_path = "data/small_littorina/img"
 
     # save_path = "ckpt/test.pth"
     
     # time = datetime.datetime.now().strftime("%Y_%m_%d_%H_%M")
     # save_path = "saved_model/pt_{}.pth".format(time)
     
-    test_percent=10
-    num_epochs =20
+    test_percent=20
+    num_epochs =5
     lr= 0.001
     batch_size = 2
 
     num_kpts = 3
     is_train=True
 
-    train(csv_path,img_path,scale, lr, batch_size,num_epochs, test_percent,train_lv='1',qt_signal=False)
+    # train(csv_path,img_path,scale, lr, batch_size,num_epochs, test_percent,train_lv='2',qt_signal=False)
+    
+    pred(csv_path = 'data/littorina_pts/name_file.csv',img_path = 'data/littorina_pts/pred',
+        output_dir='data/littorina_pts/' , model_path='saved_model/point_model_2024_04_16_20_23.pth',
+        scale=5,qt_signal=False)
+    
+    # pred(csv_path = 'data/small_littorina/pt_100.csv',img_path = 'data/small_littorina/img',
+    #      output_dir='data/small_littorina/' , model_path='saved_model/point_model_2024_04_16_19_54.pth',
+    #      scale=5,qt_signal=False)
 
     # # for predicting
     # pred_csv_path = "data\\shell_pred\\df_img.csv"

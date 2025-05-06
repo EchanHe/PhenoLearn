@@ -77,6 +77,8 @@ class LabelPanel(QWidget):
 
 
         self.has_no_hidden = False
+        
+        self.last_pos = None
 
     def clear_panel(self):
         self.canvas = QPixmap(self.rect().width() , self.rect().height())
@@ -173,8 +175,11 @@ class LabelPanel(QWidget):
 
             # Draw contour
             if self.state_place_outline and (self.contour_colour is not None) and (self.contour_name is not None):
-                self.draw_on_mask(pos.x(), pos.y(), brush_size=self.get_brush_width(), seg = self.get_brush_cate())
+                # self.draw_on_mask(pos.x(), pos.y(), brush_size=self.get_brush_width(), seg = self.get_brush_cate())
+                self.draw_on_mask_v2(pos, pos, brush_size=self.get_brush_width(), seg = self.get_brush_cate())
                 self.state_drawing_contour = True
+                
+                self.last_pos = pos
                 # p.drawPixmap(0,0, self.pixmap)
                 # p.drawPixmap(0,0, self.canvas)
                 # # self.data.set_current_segment_of_current_img(pos.x(), pos.y(), self.get_brush_width(), seg = self.get_brush_cate())
@@ -211,8 +216,10 @@ class LabelPanel(QWidget):
 
                 # # Update contour in relabel data
                 # self.data.trans_current_segment_to_contour(self.canvas, self.contour_name)
-                self.data.trans_current_segment_to_contour_cv(self.canvas, self.contour_name, self.contour_colour)
+                # self.data.trans_current_segment_to_contour_cv(self.canvas, self.contour_name, self.contour_colour)
+                self.data.trans_current_segment_to_contour_with_map(self.canvas, self.contour_name)
 
+            self.last_pos = None
 
         self.update_in_parent(pos)
         self.update()
@@ -234,10 +241,18 @@ class LabelPanel(QWidget):
             self.data.set_current_pt_of_current_img(x = x, y= y, scaled_coords = True)
 
 
-        if self.state_place_outline and self.state_drawing_contour:
+        # if self.state_place_outline and self.state_drawing_contour:
+        #     # Drawing contour
+        #     self.draw_on_mask(pos.x(), pos.y() ,brush_size=self.get_brush_width(), seg = self.get_brush_cate())
+        #     # self.data.set_current_segment_of_current_img(pos.x(), pos.y(), self.get_brush_width(), seg = self.get_brush_cate())
+
+        if self.state_place_outline and e.buttons() == Qt.LeftButton:
             # Drawing contour
-            self.draw_on_mask(pos.x(), pos.y() ,brush_size=self.get_brush_width(), seg = self.get_brush_cate())
+            # self.draw_on_mask(pos.x(), pos.y() ,brush_size=self.get_brush_width(), seg = self.get_brush_cate())
+            self.draw_on_mask_v2(self.last_pos, pos ,brush_size=self.get_brush_width(), seg = self.get_brush_cate())
+            self.last_pos = pos
             # self.data.set_current_segment_of_current_img(pos.x(), pos.y(), self.get_brush_width(), seg = self.get_brush_cate())
+
 
         self.update_in_parent(pos,self.state_moving)
         self.update()
@@ -480,7 +495,7 @@ class LabelPanel(QWidget):
         else:
             colour = QColor(0, 0, 0, 0)
 
-        print("drawing colour:", colour.value())
+        # print("drawing colour:", colour.value())
         pen = QPen(colour, 4)
         brush = QBrush(colour)
         p_mask.setPen(pen)
@@ -488,11 +503,35 @@ class LabelPanel(QWidget):
 
         p_mask.drawEllipse(x , y, brush_size, brush_size)
 
-    def draw_init_mask(self , items,  colors):
+        # pen = QPen(colour, brush_size, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin)
+        # p_mask.setPen(pen)
+        # p_mask.drawLine(x, y)
+
+    def draw_on_mask_v2(self ,start_pos , end_pos,brush_size,  seg):
+        p_mask = QPainter(self.canvas)
+        p_mask.setCompositionMode(QPainter.CompositionMode_Source)
+
+        if seg == 1:
+            # colour = QColor(0, 255, 255, 100)
+            # Draw the segmentation based on contour colour
+            colour = self.contour_colour
+        else:
+            # Eraser
+            colour = QColor(0, 0, 0, 0)
+        if self.contour_colour is None:
+            return
+        
+        # print("drawing colour:", colour.value())
+
+        pen = QPen(colour, brush_size, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin)
+        p_mask.setPen(pen)
+        p_mask.drawLine(start_pos, end_pos)
+
+
+    def draw_init_mask(self, items ,  colors):
         """
 
-        :param item: list of ticked item
-        :param color: list of color of ticked item
+        :param color: dict of seg idx: segment contours
         :return:
         """
 
@@ -510,24 +549,30 @@ class LabelPanel(QWidget):
         # Draw the segmentations using segmentation cv
         if segments_cv:
             if self.parent():
-                for item, color in zip(items, colors):
+                for item in items:
                     key = item.text()
                     contour_cv = segments_cv[key]['contours']
-                    self.draw_seg_cv(img_cv_draw,contour_cv , color)
-
+                    self.draw_seg_cv(img_cv_draw,contour_cv , colors[key])
+                # for key, color in colors.items():
+                #     contour_cv = segments_cv[key]['contours']
+                #     self.draw_seg_cv(img_cv_draw,contour_cv , color)
 
         image_cv_draw = QImage(img_cv_draw, img_cv_draw.shape[1],\
         img_cv_draw.shape[0], img_cv_draw.shape[1] * 4,QImage.Format_RGBA8888)
         self.canvas  = QPixmap(image_cv_draw)
 
-    def reset_mask(self):
+    def reset_mask(self, reset_data_current_mask = False):
         """
-        Only is called in file_list_current_item_changed()
+        Reset the canvas mask
+        Called in file_list_current_item_changed() or update_segment_drawing()
         :return:
         """
         img_size = self.data.get_current_scaled_pixmap().size()
         self.canvas = self.canvas.scaled(img_size , aspectRatioMode    = Qt.IgnoreAspectRatio)
         self.canvas.fill(QColor(0, 0, 0, 0))
+        if reset_data_current_mask:
+            # Reset the background mask as well
+            self.data.current_mask = None
 
     def wheelEvent(self,e):
         modifiers = QApplication.keyboardModifiers()

@@ -156,23 +156,24 @@ class BrowsePanel(QWidget):
         segments_cv = args[3]
         img_name_id = self.data.img_id_order[img_id]
         # print(img_id, pixmap is not None , self.data.images[img_id].label_changed)
-        if not (pixmap is None and self.data.images[img_name_id].label_changed == False):
-            if pixmap is not None:
-                self.thumbnail_list[img_id] = pixmap.copy()
-            elif self.data.images[img_name_id].label_changed:
-                pixmap = self.thumbnail_list[img_id].copy()
-                self.data.images[img_name_id].label_changed = False
+        # if not (pixmap is None and self.data.images[img_name_id].label_changed == False):
+        if pixmap is not None:
+            self.thumbnail_list[img_id] = pixmap.copy()
+        # elif self.data.images[img_name_id].label_changed:
+        else:
+            pixmap = self.thumbnail_list[img_id].copy()
+            self.data.images[img_name_id].label_changed = False
 
-            
-            self.painter.begin(pixmap)
-            self.draw_points_with_painter(self.painter,points_dict)
-            self.painter.drawPixmap(0,0,self.draw_seg_args(segments_cv))
-            self.painter.end()
+        
+        self.painter.begin(pixmap)
+        self.draw_points_with_painter(self.painter,points_dict)
+        self.painter.drawPixmap(0,0,self.draw_seg_args(segments_cv))
+        self.painter.end()
 
-            pixmap = pixmap.scaled(icon_size, aspectRatioMode=Qt.KeepAspectRatio)
-            icon = QIcon()
-            icon.addPixmap(pixmap, QIcon.Normal, QIcon.Off)
-            self.widget_image_browser.item(img_id).setIcon(icon)
+        pixmap = pixmap.scaled(icon_size, aspectRatioMode=Qt.KeepAspectRatio)
+        icon = QIcon()
+        icon.addPixmap(pixmap, QIcon.Normal, QIcon.Off)
+        self.widget_image_browser.item(img_id).setIcon(icon)
 
 
 
@@ -274,9 +275,9 @@ class BrowsePanel(QWidget):
 
         # Draw the segmentation using draw_seg_cv(self,img_cv_draw,contour_cv,color,scale)
         if segments_cv:
-            for idx_item, (_, item) in enumerate(segments_cv.items()):
+            for idx_item, (key, item) in enumerate(segments_cv.items()):
                 contour_cv = item['contours']
-
+    
                 cur_color = self.parent().window().seg_colours[idx_item%len(self.parent().window().seg_colours)]
                 self.draw_seg_cv(img_cv_draw,contour_cv , cur_color , scale)
 
@@ -303,7 +304,7 @@ class BrowsePanel(QWidget):
         if contour_cv is not None:
             contour_cv = [(np.array(contour, dtype='int32') //scale).astype('int32') for contour in contour_cv]
             cv_colour = (color.red() , color.green() , color.blue() ,color.alpha())
-            print("cv colour in LabelPanel.draw_seg_cv" , cv_colour)
+            print("cv colour in Browse_Panel.draw_seg_cv" , cv_colour)
             cv2.fillPoly(img_cv_draw, contour_cv, cv_colour)
             # img_cv_draw[img_cv_draw[...,3] >0 , : ] = cv_colour
 

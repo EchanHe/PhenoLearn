@@ -21,7 +21,7 @@ from label_data import Data_gui
 
 
 
-PROGRAM_NAME = 'PhenoLabel'
+PROGRAM_NAME = 'PhenoLabel_202501'
 
 def set_widget_font_size(widget, size=None, offset=None, bold = False):
     """Helper function that sets the widget's font size (setPointSize(size))
@@ -106,10 +106,25 @@ class MainWindow(QMainWindow):
                                 """
                                 )
 
-        self.seg_colours = [QColor(220,20,60,100), QColor(255,165,0,100),
+        self.seg_colours = [QColor(220,20,60,100), QColor(255,165,0,101),
                             QColor(238,232,170,102), QColor(255,255,0,103),
-                            QColor(124,252,0,104), QColor(46,139,87,105),
+                            QColor(124,252,0,110), QColor(46,139,87,105),
                             QColor(0,255,255,106), QColor(0,0,255,107)]
+
+        self.seg_colours = [
+            QColor(220, 20, 60, 100),    # Crimson
+            QColor(255, 165, 0, 100),    # Orange
+            QColor(238, 232, 170, 100),  # Pale Goldenrod
+            QColor(255, 255, 0, 100),    # Yellow
+            QColor(0, 128, 0, 100),      # Green
+            QColor(46, 139, 87, 100),    # Sea Green
+            QColor(0, 255, 255, 100),    # Cyan
+            QColor(0, 0, 255, 100),      # Blue
+            QColor(128, 0, 128, 100),    # Purple
+            QColor(255, 20, 147, 100),   # Deep Pink
+            QColor(139, 69, 19, 100),    # Saddle Brown
+            QColor(128, 128, 128, 100)   # Gray
+        ]
 
         self.data = Data_gui()
 
@@ -524,6 +539,8 @@ class MainWindow(QMainWindow):
         self.toolbar.addAction(self.act_attention_imgs_only)
         self.toolbar.addSeparator()
         self.toolbar.addAction(self.act_quick_label_mode)
+      
+
 
         self.toolbar_outline =QToolBar("Outline")
         self.toolbar_outline.addActions(self.act_group_brush_cate.actions())
@@ -953,7 +970,8 @@ class MainWindow(QMainWindow):
                 #     self.widget_file_list.addItem(img.img_name)
                 # for img_name,_ in self.data.images.items():
                 #     self.widget_file_list.addItem(img_name)
-                for img_name in self.data.img_id_order:
+                sorted_img_names = sorted(self.data.img_id_order)
+                for img_name in sorted_img_names:
                     self.widget_file_list.addItem(img_name)
 
                 self.widget_annotation.has_no_hidden = self.hide_file_names()
@@ -1090,7 +1108,7 @@ class MainWindow(QMainWindow):
                 idx = keys.index(cur_key)
                 self.widget_point_list.setCurrentRow(idx)
 
-    def list_seg_name(self):
+    def list_seg_name_old(self):
         """List segmentation to the seg list widget in the annotation panel
         Combining segmentation name and colour information into a dict
         
@@ -1127,6 +1145,51 @@ class MainWindow(QMainWindow):
                 self.widget_segment_list.addItem(item)
 
             self.widget_segment_list.setCurrentRow(0)
+            self.update_segment_drawing()
+
+    def list_seg_name(self, selected_row="default"):
+        """List segmentation to the seg list widget in the annotation panel
+        Using segs_name_id_map
+        Combining segmentation name and colour information into a dict
+        
+        Called when selected image changed, seg added or deleted
+
+        """
+        self.current_image_colour_map = {}
+
+
+        self.widget_segment_list.clear()
+        # self.widget_segment_combobox.clear()
+        
+        self.data.set_current_image_current_mask()
+
+        segs_name_id_map = self.data.get_current_image_seg_map()
+        if (segs_name_id_map is not None) and segs_name_id_map:
+            keys = list(segs_name_id_map.keys())
+            if self.act_sort_anno_names.isChecked():
+                # sort annotaions
+                keys.sort()
+
+            for _, key in enumerate(keys):
+                item = QListWidgetItem()
+                item.setText(key)
+                item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
+                item.setCheckState(Qt.Checked)
+                icon = QPixmap(10,10)
+                
+                idx = segs_name_id_map[key]
+                
+                icon.fill(self.seg_colours[idx % len(self.seg_colours)])
+
+                self.current_image_colour_map[key] = self.seg_colours[idx % len(self.seg_colours)]
+
+                item.setIcon(QIcon(icon))
+
+                self.widget_segment_list.addItem(item)
+            if selected_row =="default":
+                self.widget_segment_list.setCurrentRow(0)
+            elif selected_row =="added":
+                self.widget_segment_list.setCurrentRow(self.widget_segment_list.count()-1)
             self.update_segment_drawing()
 
     def list_properties(self):
@@ -1212,7 +1275,7 @@ class MainWindow(QMainWindow):
 
 
 
-            self.widget_annotation.reset_mask()
+            self.widget_annotation.reset_mask(reset_data_current_mask= True)
             self.widget_annotation.update()
 
 
@@ -1244,8 +1307,14 @@ class MainWindow(QMainWindow):
         """
 
         if row !=-1:
-            self.widget_annotation.contour_colour = self.seg_colours[row % len(self.seg_colours)]
+            # set the colour and seg name in the label_panel
+            
             self.widget_annotation.contour_name = self.widget_segment_list.item(row).text()
+            segs_name_id_map = self.data.get_current_image_seg_map()
+            idx = segs_name_id_map[self.widget_annotation.contour_name]
+            self.widget_annotation.contour_colour = self.seg_colours[idx % len(self.seg_colours)]
+            # self.widget_annotation.contour_colour = self.seg_colours[row % len(self.seg_colours)]
+            
             self.list_properties()
         else:
             self.widget_annotation.contour_colour = None
@@ -1438,7 +1507,8 @@ class MainWindow(QMainWindow):
             cur_idx = self.widget_segment_list.currentRow()
             cur_color = self.seg_colours[cur_idx%len(self.seg_colours)]
 
-            self.data.close_current_segment(self.widget_annotation.canvas, self.widget_segment_list.currentItem().text(), cur_color)
+            # self.data.close_current_segment(self.widget_annotation.canvas, self.widget_segment_list.currentItem().text(), cur_color)
+            self.data.close_current_segment_map( self.widget_segment_list.currentItem().text())
             self.update_segment_drawing()
         except Exception as e:
             print(e)
@@ -1451,11 +1521,12 @@ class MainWindow(QMainWindow):
 
             if name:
                 if self.data.add_seg_for_current_img(name):
-                    print("added")
+                    # print("added")
+                    self.list_seg_name(selected_row="added")
                 else:
                     QMessageBox.about(self, "Failed", "Fail to add the label\nname is duplicate.")
 
-            self.list_seg_name()
+            
 
     def delete_segmentation(self):
         """Delete the segmentation
@@ -1559,7 +1630,7 @@ class MainWindow(QMainWindow):
     def update_segment_drawing(self):
         """
         Update segmentation on the image.
-        Paint ticked segmentation
+        Paint, erase or ticked segmentation
 
         event: clicking the segmentation panel
 
@@ -1567,16 +1638,24 @@ class MainWindow(QMainWindow):
         """
         self.widget_annotation.reset_mask()
         items = []
-        colors = []
+        # colors = []
+        colors = {}
+        
+        segs_name_id_map = self.data.get_current_image_seg_map()
+        
         for i_item in range(self.widget_segment_list.count()):
             item = self.widget_segment_list.item(i_item)
             # Draw the certain mask
             if item.checkState() == 2:
                 items.append(item)
-                colors.append(self.seg_colours[i_item%len(self.seg_colours)])
+                
+                idx = segs_name_id_map[item.text()]
+                colors[item.text()] = self.seg_colours[idx%len(self.seg_colours)]
+                # colors[i_item] = self.seg_colours[i_item%len(self.seg_colours)]
+                # colors.append(self.seg_colours[i_item%len(self.seg_colours)])
 
         self.widget_annotation.draw_init_mask(items, colors)
-
+        # self.widget_annotation.draw_init_mask(colors)
         self.widget_annotation.update()
 
     def menu_point_list(self,position):

@@ -1,7 +1,9 @@
 *.pyc
+__pycache__/
 
-data/*
+# data/*
 !data/bird_10
+data_dl/*
 
 assets/*edi.pptx
 assets/img/
@@ -10,6 +12,7 @@ deeplearning/deprecate_pycocotools/
 runs/
 saved_model/
 
+output/
 deeplearning/ui/*
 !deeplearning/ui/pred_ui.py
 !deeplearning/ui/train_ui.py

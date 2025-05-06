@@ -352,7 +352,9 @@ class Data():
         self.points_origin = None
 
         self.img_props = {}
-
+        self.segs_name_id_map = {}
+        self.current_mask = None
+        
         self.init_images()
 
     def restore_to_empty(self):
@@ -366,6 +368,9 @@ class Data():
         self.pt_names = set()
         self.seg_names = set()
         self.img_props = {}
+        
+        self.segs_name_id_map = {}
+        self.current_mask = None
     
     def init_images(self):
         """initial the images of Data class
@@ -758,14 +763,60 @@ class Data():
 
         cur_seg_names = list(self.get_current_image_segments_cv().keys())
         if seg_name not in cur_seg_names:
-            self.get_current_image_segments_cv()[seg_name]={"contours":None}
+            self.get_current_image_segments_cv()[seg_name]={"contours":[]}
             self.seg_names.add(seg_name)
             self.changed = True
+            
+            self.add_seg_map_for_current_img(seg_name)
             
             return True
         else:
             return False
 
+    def add_seg_map_for_current_img(self, seg_name):
+        file_name = self.get_current_image_name()
+        if file_name not in self.segs_name_id_map:
+            self.segs_name_id_map[file_name] = {}  # Initialize empty dict for this file
+
+        # Assign new ID: If the dictionary is empty, start from 1, otherwise, max_id + 1
+        if not self.segs_name_id_map[file_name]:
+            new_id = 1
+        else:
+            new_id = max(self.segs_name_id_map[file_name].values()) + 1
+
+        # Assign the ID to the seg_name
+        self.segs_name_id_map[file_name][seg_name] = np.uint8(new_id)  # Store as uint8
+        print(f"adding new {new_id}, now mapping is: {self.segs_name_id_map}")
+
+    def set_current_image_current_mask(self):
+        """init the current mask. 
+        If there are contour_cv in this mask, update it too.
+        """
+        if self.current_mask is not None:
+            print(f"current mask exists, unique {np.unique(self.current_mask)}")
+            return
+        else:
+            height = self.get_current_origin_pixmap().height()
+            width = self.get_current_origin_pixmap().width()
+            self.current_mask = np.zeros((height, width)).astype('uint8')
+            print("create current mask")
+            
+            segments_cv = self.get_current_image_segments_cv()
+            if segments_cv:
+                segs_name_id_map = self.get_current_image_seg_map()
+                for key in segments_cv:
+                    if segs_name_id_map is None or key not in segs_name_id_map:
+                        self.add_seg_map_for_current_img(key)
+                        segs_name_id_map = self.get_current_image_seg_map()
+                    # print(f"updating {key} to mask")
+                    contour_cv = segments_cv[key]['contours']
+                    if contour_cv is not None:
+                        contour_cv = [np.array(contour, dtype='int32') for contour in contour_cv]
+                        
+                        idx = segs_name_id_map[key]
+                        cv2.fillPoly(self.current_mask, contour_cv, int(idx))
+                    
+            
 
 
     # To be removed
@@ -862,10 +913,19 @@ class Data():
         ## only the mask for the current category
         cv_colour = (contour_colour.red() , contour_colour.green() , contour_colour.blue() ,contour_colour.alpha())
 
+        # print(f"image arr np.unique():{np.unique(arr[:,:,:3])}")
+        # Check if the colour matches.
         img_mask = arr[:,:,:3] != cv_colour[:3]
         mask_final = np.logical_and(img_mask[...,0], img_mask[...,1],img_mask[...,2])
         arr[mask_final,3] =0
         mask = arr[:,:,3]
+
+        print(cv_colour)
+        print(f"np.unique(arr[:,:,0]):{np.unique(arr[:,:,0])} ,np.unique(arr[:,:,1]):{np.unique(arr[:,:,1])}, np.unique(arr[:,:,2]):{np.unique(arr[:,:,2])}")
+        print(f"np.unique(arr[:,:,3]):{np.unique(arr[:,:,3])}")
+        # mask = (arr[:,:,:] == cv_colour[:])*255
+        
+
 
         _,thresh = cv2.threshold(mask,2,255,0)
 
@@ -882,6 +942,66 @@ class Data():
         self.get_current_image_segments_cv()[segment_name]['contours'] = contours
         
         self.changed=True
+
+    def trans_current_segment_to_contour_with_map(self, segment, segment_name):
+        """Convert the drawing from images to contours from Opencv and save the contours in self
+
+        Args:
+            segment (_type_): drawing/segmentation
+            segment_name (_type_): The name of the segmentation class
+            contour_colour (_type_): The colour for the segmentation
+        """        """"""
+        """
+        
+        :param canvas:
+        :param contour_name:
+        :return:
+        """
+        height = self.get_current_origin_pixmap().height()
+        width = self.get_current_origin_pixmap().width()
+        
+        image = segment.toImage()
+
+        image = image.convertToFormat(QImage.Format_RGBA8888)
+
+        s = image.bits().asstring(image.width()*image.height() * 4)
+        arr = np.fromstring(s, dtype=np.uint8).reshape((image.height(),image.width() ,4))
+
+        new_mask = (arr[:,:,3] !=0)
+        new_mask = cv2.resize(new_mask.astype('uint8'), 
+                                (width , height), interpolation=cv2.INTER_NEAREST)
+        new_mask = new_mask.astype(bool)
+        
+        old_mask = (self.current_mask!=0)
+
+        # Identify where mask1 is False and mask2 is True
+        mask_add = (~old_mask) & new_mask
+
+        # Identify where mask1 is True and mask2 is False
+        mask_delete = old_mask & (~new_mask)
+        
+        print(f"sum of mask add and mask delete: {np.sum(mask_add)} {np.sum(mask_delete)}")
+        
+        segs_name_id_map = self.get_current_image_seg_map()
+        idx = segs_name_id_map[segment_name]
+        
+        self.current_mask[mask_add] = idx
+        self.current_mask[mask_delete] = 0
+
+        mask = (self.current_mask==idx).astype('uint8')*100
+
+        _,thresh = cv2.threshold(mask,1,255,0)
+
+
+        contours, hierarchy = cv2.findContours(thresh,cv2.RETR_TREE,cv2.CHAIN_APPROX_SIMPLE)
+
+
+        contours = [contour.tolist() for contour in contours]
+        self.get_current_image_segments_cv()[segment_name]['contours'] = contours
+        
+        self.changed=True
+        
+        print(f"mask ids: {np.unique(self.current_mask)}")
 
     def close_current_segment(self, segment, segment_name, contour_colour):
         """Auto fill closed outlines that were drawn on the segmetnation.
@@ -923,6 +1043,62 @@ class Data():
         contours = [contour.tolist() for contour in contours]
         self.get_current_image_segments_cv()[segment_name]['contours'] = contours
 
+
+    def close_current_segment_map(self, segment_name):
+        """Auto fill closed outlines that were drawn on the segmetnation.
+        Called from auto_fill() from the main file.
+
+        Args:
+            segment (_type_): drawing/segmentation
+            segment_name (_type_): The name of the segmentation class
+            contour_colour (_type_): The colour for the segmentation
+        """        
+        
+        segs_name_id_map = self.get_current_image_seg_map()
+        idx = segs_name_id_map[segment_name]
+
+        mask = (self.current_mask==idx)
+
+        mask = (self.current_mask==idx).astype('uint8')*100
+        _,thresh = cv2.threshold(mask,1,255,0)
+        contours, hierarchy = cv2.findContours(thresh,cv2.RETR_TREE,cv2.CHAIN_APPROX_SIMPLE)
+
+
+        for contour in contours:
+            cv2.fillPoly(self.current_mask, [contour], int(idx))
+
+        mask = (self.current_mask==idx).astype('uint8')*100
+        _,thresh = cv2.threshold(mask,1,255,0)
+        contours, hierarchy = cv2.findContours(mask,cv2.RETR_TREE,cv2.CHAIN_APPROX_SIMPLE)
+        
+        contours = [contour.tolist() for contour in contours]
+        self.get_current_image_segments_cv()[segment_name]['contours'] = contours
+        # cv_colour = (contour_colour.red() , contour_colour.green() , contour_colour.blue() ,contour_colour.alpha())
+        # img_mask = arr[:,:,:3] != cv_colour[:3]
+        # mask_final = np.logical_and(img_mask[...,0], img_mask[...,1],img_mask[...,2])
+        # arr[mask_final,3] =0
+        # mask = arr[:,:,3]
+
+        # _,thresh = cv2.threshold(mask,2,255,0)
+        # height = self.get_current_origin_pixmap().height()
+        # width = self.get_current_origin_pixmap().width()
+
+        # thresh = cv2.resize(thresh,(width , height))
+
+        # contours, hierarchy = cv2.findContours(thresh,cv2.RETR_TREE,cv2.CHAIN_APPROX_SIMPLE)
+
+
+        # mask_empty=np.zeros((height, width ,1)).astype('uint8')
+
+        # for contour in contours:
+        #     cv2.fillPoly(mask_empty, [contour], 255)
+
+        # contours, hierarchy = cv2.findContours(mask_empty,cv2.RETR_TREE,cv2.CHAIN_APPROX_SIMPLE)
+
+
+        # contours = [contour.tolist() for contour in contours]
+        # self.get_current_image_segments_cv()[segment_name]['contours'] = contours
+
     def remove_pt_for_current_img(self, key = None):
         """Remove the current point or point with key given
 
@@ -948,9 +1124,21 @@ class Data():
 
         """
         if key is None:
-            key = self.get_current_image().current_pt_key
+            return
 
+        # Remove segments_cv in the data
         self.get_current_image_segments_cv().pop(key , None)
+
+        # Remove it in current mask
+        segs_name_id_map = self.get_current_image_seg_map()
+        idx = segs_name_id_map[key]
+        self.current_mask[self.current_mask==idx] = 0
+        
+        # Remove it in the segs_name_id_map
+        current_name = self.get_current_image_name()
+        self.segs_name_id_map[current_name].pop(key , None)
+
+
 
         self.changed = True
 
@@ -988,7 +1176,15 @@ class Data():
             return None
 
 
-
+    def get_current_image_seg_map(self):
+        if self.images:
+            img_name = self.images[self.current_image_id].img_name
+            if img_name in self.segs_name_id_map:
+                return self.segs_name_id_map[img_name]
+            else:
+                return None
+        else:
+            return None 
 
     def get_current_image_segments_cv(self):
         if self.images:
@@ -1214,7 +1410,7 @@ class Data_gui(Data, QObject):
         Data.__init__(self,file_name,work_dir)
         QObject.__init__(self)
         # super().__init__()
-
+        
         if self.images:
             self.signal_has_images.emit()
 

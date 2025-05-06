@@ -7,6 +7,8 @@ from PyQt5.QtGui import *
 import sys,os
 import pandas as pd
 
+from torch.cuda import is_available
+
 # sys.path.append('ui/')
 # import deeplearning.ui.train_ui as train_ui
 # import deeplearning.ui.pred_ui as pred_ui
@@ -60,7 +62,8 @@ class train_Thread(QThread):
     """
     _signal = pyqtSignal(str)
 
-    def __init__(self,mode,format, csv_path,img_path,mask_path,scale, lr, batch,num_epochs,test_percent,train_lv,mainWin):
+    def __init__(self,mode,format, csv_path,img_path,mask_path,scale, lr,
+                 batch,num_epochs,test_percent,train_lv,mainWin, hardware_mode):
     # def __init__(self):
         super(train_Thread, self).__init__()
         
@@ -76,6 +79,7 @@ class train_Thread(QThread):
         self.mainWin= mainWin
         self.mask_path=mask_path
         self.format=format
+        self.hardware_mode = hardware_mode
         
     def __del__(self):
         self.wait()
@@ -91,13 +95,17 @@ class train_Thread(QThread):
         if self.mode=="Segmentation":
             if self.format=="CSV":
                 seg_deeplab.train(self.img_path, self.scale, self.lr, self.batch,
-                            self.num_epochs,self.test_percent,self.train_lv,self._signal, csv_path=self.csv_path,mask_path=None)
+                            self.num_epochs,self.test_percent,self.train_lv, qt_signal=self._signal,
+                            hardware_mode = self.hardware_mode, csv_path=self.csv_path,mask_path=None)
             else:
+                # When loading in images
                 seg_deeplab.train(self.img_path, self.scale, self.lr, self.batch,
-                            self.num_epochs,self.test_percent,self.train_lv,self._signal, csv_path=None,mask_path=self.mask_path)
+                            self.num_epochs,self.test_percent,self.train_lv,qt_signal=self._signal,
+                            hardware_mode = self.hardware_mode, csv_path=None,mask_path=self.mask_path)
         elif self.mode=="Point":
             kpt_rcnn.train(self.csv_path,self.img_path,self.scale,self.lr,self.batch,
-                        self.num_epochs,self.test_percent,self.train_lv,self._signal)            
+                        self.num_epochs,self.test_percent,self.train_lv,qt_signal=self._signal,
+                        hardware_mode = self.hardware_mode)            
         # except Exception as e:        
             # QMessageBox.warning(self.mainWin, "Warning" , "Error message from Python {}\nPlease check the input images and annotations are correct".format(str(e)))
         # for i in range(self.num_epochs):
@@ -113,7 +121,7 @@ class pred_Thread(QThread):
     """
     _signal = pyqtSignal(str)
 
-    def __init__(self,mode, format,csv_path,img_path,model_path,output_dir, scale,mainWin):
+    def __init__(self,mode, format,csv_path,img_path,model_path,output_dir, scale,mainWin,hardware_mode):
     # def __init__(self):
         super(pred_Thread, self).__init__()
         
@@ -126,6 +134,7 @@ class pred_Thread(QThread):
         self.scale = scale
 
         self.mainWin= mainWin
+        self.hardware_mode = hardware_mode
 
         
     def __del__(self):
@@ -135,11 +144,11 @@ class pred_Thread(QThread):
         # try:
         if self.mode=="Segmentation":
             seg_deeplab.pred(self.csv_path,self.img_path, self.model_path,self.output_dir,
-                        self.format, self.scale,self._signal)
+                        self.format, self.scale,self._signal , hardware_mode = self.hardware_mode)
 
         elif self.mode=="Point":
             kpt_rcnn.pred(self.csv_path,self.img_path, self.model_path,self.output_dir,
-                        self.scale,self._signal)
+                        self.scale,self._signal, hardware_mode = self.hardware_mode)
         # except Exception as e:        
         #     QMessageBox.warning(self.mainWin, "Warning" , str(e))
         
@@ -156,7 +165,7 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super(MainWindow, self).__init__()
         # self.widget_dl = tab_ui.Ui_TabWidget()
-        self.setWindowTitle('PhenoTrain')
+        self.setWindowTitle('PhenoTrain_202501')
         
         self.train_ui = train_ui.Ui_Form()
         self.widget_train = QWidget()
@@ -383,7 +392,7 @@ class MainWindow(QMainWindow):
             train_lv="3"
         
         if not input_check:
-             QMessageBox.about(self, "Information", "Please check if all settings are correct.")
+            QMessageBox.about(self, "Information", "Please check if all settings are correct.")
         else:
             # Take all the configurations from UI
             num_epochs = self.train_ui.spinBox_epoch.value()
@@ -413,12 +422,20 @@ class MainWindow(QMainWindow):
             csv_path=self.train_ui.lineEdit_file.text()
             img_path=self.train_ui.lineEdit_dir.text()
             
-                
+
+            
+            hardware_mode = self.train_ui.comboBox_cpu_gpu.currentText()
+            if self.train_ui.comboBox_cpu_gpu.currentText()=="GPU":
+                if not is_available():
+                    hardware_mode = "CPU"
+                    QMessageBox.about(self, "Information", "Didn't find CUDA-supported GPU, using CPU")
+
             
             self.train_thread = train_Thread(mode=mode,format=format ,
                                             csv_path = csv_path,img_path=img_path,mask_path=mask_path,
                                         scale=scale, lr =lr, batch = batch,
-                                        num_epochs=num_epochs,test_percent=test_percent,train_lv =train_lv,mainWin=self )
+                                        num_epochs=num_epochs,test_percent=test_percent,train_lv =train_lv,mainWin=self,
+                                        hardware_mode = hardware_mode)
             
             # self.train_thread = train_Thread(mode=mode , csv_path = "",
             #                         img_path="self.work_dir",scale=scale, lr =lr, batch = batch,
@@ -446,18 +463,37 @@ class MainWindow(QMainWindow):
         img_path = self.pred_ui.lineEdit_dir.text()
         model_path = self.pred_ui.lineEdit_checkpoint.text()
         output_dir = self.pred_ui.lineEdit_output.text()
+
+        # Check the if the input is correct
+        input_check = (self.pred_ui.lineEdit_file.text()!='') & \
+            (self.pred_ui.lineEdit_dir.text()!='') & \
+            (self.pred_ui.lineEdit_output.text()!='') &\
+            (self.pred_ui.lineEdit_checkpoint.text()!='')
+        
+        if not input_check:
+            QMessageBox.about(self, "Information", "Please check if all settings are correct.")
+            return
         
         
         # Set the maximum and text of the progress bar
         df_temp=pd.read_csv(csv_path)
+
         num_img = df_temp.shape[0]    
         self.pbar_widget.pbar.setFormat("Images: %v/{}".format(num_img))
         self.pbar_widget.pbar.setMaximum(num_img)
-        
+
+        hardware_mode = self.pred_ui.comboBox_cpu_gpu.currentText()
+        if self.pred_ui.comboBox_cpu_gpu.currentText()=="GPU":
+            if not is_available():
+                hardware_mode = "CPU"
+                QMessageBox.about(self, "Information", "Didn't find CUDA-supported GPU, using CPU")
+
         self.pred_thread = pred_Thread(mode=mode,format=format,
                                        csv_path=csv_path,img_path=img_path,
                                        model_path=model_path,output_dir=output_dir, 
-                                       scale=scale,mainWin = self)
+                                       scale=scale,mainWin = self,
+                                       hardware_mode = hardware_mode)
+        
         self.pred_thread._signal.connect(self.signal_accept)
         self.pred_thread.start()
         

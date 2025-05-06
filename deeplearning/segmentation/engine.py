@@ -80,16 +80,16 @@ def dice_score(output, target, eps=1e-7):
     # ensure the output is in the same shape with target
     num_classes = output.shape[1]
     output = torch.argmax(output, dim=1)
-
+    
     
     dice_per_class = torch.zeros(num_classes).to(output.device)
 
     for i in range(num_classes):
-        true_mask = (target == i)
+        true_mask = (target[:,i,...])
         pred_mask = (output == i)
 
         intersection = (true_mask & pred_mask).sum().float()
-        total = (true_mask | pred_mask).sum().float()
+        total = true_mask.sum() + pred_mask.sum().float()
 
         dice_per_class[i] = (2 * intersection + eps) / (total + eps)
 
@@ -109,7 +109,7 @@ def evaluate(model, data_loader, device, num_classes, criterion):
 
     
     with torch.inference_mode():
-        for image, target in metric_logger.log_every(data_loader, 100, header):
+        for image, target in metric_logger.log_every(data_loader, 1, header):
             image, target = image.to(device), target.to(device)
             output = model(image)
             output = output["out"]

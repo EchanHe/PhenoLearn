@@ -77,6 +77,7 @@ def evaluate(model, data_loader, device):
 #     iou_types = _get_iou_types(model)
 #     coco_evaluator = CocoEvaluator(coco, iou_types)
     oks_values = []
+    pixel_dist_values = []
     running_loss = 0
     for images, targets in metric_logger.log_every(data_loader, 100, header):
         images = list(img.to(device) for img in images)
@@ -97,14 +98,20 @@ def evaluate(model, data_loader, device):
         running_loss += sum(losses) / len(losses)
         
         for i_batch in range(len(targets)):
-            oks = compute_oks(targets[0]['keypoints'], outputs[0]['keypoints'])
-            oks_values.append(oks)
+            # oks = compute_oks(targets[0]['keypoints'], outputs[0]['keypoints'])
+            # oks_values.append(oks)
+            
+            pixel_dist = compute_pixel_dist(targets[0]['keypoints'], outputs[0]['keypoints'])
+            pixel_dist_values.append(pixel_dist)
+            
     metric_logger.update(loss=running_loss)    
 
-    oks_values = np.array(oks_values)
-    print("validation oks:" , oks_values)
+    # oks_values = np.array(oks_values)
+    # print("validation oks:" , oks_values)
     
-    return metric_logger,oks_values
+
+    
+    return metric_logger,pixel_dist_values
     
     
 
@@ -146,7 +153,29 @@ def compute_oks(target, pred, sigmas=None, in_vis_thre=None):
 
     return oks
 
+def compute_pixel_dist(target, pred):
+    """
+    Compute compute_pixel_dist between predicted keypoints and ground truth keypoints.
 
+    """
+    # Prepare sigmas and in_vis_thre if not provided
+    
+    target = target[0].detach().numpy()
+    if pred.shape[0]==0:
+        print("prediction doesn't have keypoints")
+        return np.zeros((target.shape[0],))
+    pred=pred[0].detach().numpy()
+    # For each visible keypoint, compute the OKS
+    num_kpt = target.shape[0]
+    pixel_dist = np.zeros((num_kpt,))
+    for i in range(num_kpt):
+        # print(pred[i,:2], target[i,:2])
+        d = np.linalg.norm(pred[i,:2] - target[i,:2])
+        pixel_dist[i] =  d
+        # e = d / sigmas[i]
+        # oks[i] = np.exp(-e**2 / 2) if vis_target[i] else 1
+
+    return pixel_dist
 
 
 #         res = {target["image_id"].item(): output for target, output in zip(targets, outputs)}
