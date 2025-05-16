@@ -208,9 +208,9 @@ class BrowsePanel(QWidget):
                     pixmap = self.thumbnail_list[img_id].copy()
                     self.data.images[img_name_id].label_changed = False
 
-                print("browser panel: " + img_name_id)
-                print(img_id)
-                print(points_dict)
+                # print("browser panel: " + img_name_id)
+                # print(img_id)
+                # print(points_dict)
                
                 self.painter.begin(pixmap)
                 self.draw_points_with_painter(self.painter,points_dict)
@@ -275,9 +275,10 @@ class BrowsePanel(QWidget):
 
         # Draw the segmentation using draw_seg_cv(self,img_cv_draw,contour_cv,color,scale)
         if segments_cv:
-            for idx_item, (key, item) in enumerate(segments_cv.items()):
+            for _, (key, item) in enumerate(segments_cv.items()):
                 contour_cv = item['contours']
-    
+                segs_name_id_map = self.data.get_current_image_seg_map()
+                idx_item = segs_name_id_map[key]
                 cur_color = self.parent().window().seg_colours[idx_item%len(self.parent().window().seg_colours)]
                 self.draw_seg_cv(img_cv_draw,contour_cv , cur_color , scale)
 
@@ -304,7 +305,7 @@ class BrowsePanel(QWidget):
         if contour_cv is not None:
             contour_cv = [(np.array(contour, dtype='int32') //scale).astype('int32') for contour in contour_cv]
             cv_colour = (color.red() , color.green() , color.blue() ,color.alpha())
-            print("cv colour in Browse_Panel.draw_seg_cv" , cv_colour)
+            # print("cv colour in Browse_Panel.draw_seg_cv" , cv_colour)
             cv2.fillPoly(img_cv_draw, contour_cv, cv_colour)
             # img_cv_draw[img_cv_draw[...,3] >0 , : ] = cv_colour
 

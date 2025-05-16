@@ -19,67 +19,6 @@ from PyQt5.QtGui import QImage
 import numpy as np
 import cv2
 
-def mask_overlay_on_image(original_image: np.ndarray, segmentation_mask: np.ndarray, alpha: float = 0.4) -> QImage:
-    """
-    将 segmentation mask overlay 到原图上，并返回 PyQt 可用的 QImage
-
-    Args:
-        original_image (np.ndarray): 原始图像（BGR格式）
-        segmentation_mask (np.ndarray): 单通道整数 mask，0 表示背景，不 overlay
-        alpha (float): overlay 的透明度（0-1）
-
-    Returns:
-        QImage: 可直接显示的图像
-    """
-
-    # 定义颜色表：8种 RGB 颜色
-    color_map = np.array([
-        [255, 0, 0],      # Red
-        [0, 255, 0],      # Green
-        [0, 0, 255],      # Blue
-        [255, 255, 0],    # Yellow
-        [255, 0, 255],    # Magenta
-        [0, 255, 255],    # Cyan
-        [255, 128, 0],    # Orange
-        [128, 0, 255],    # Purple
-    ], dtype=np.uint8)
-
-    # 转为 RGB（PyQt 用 RGB）
-    base_rgb = cv2.cvtColor(original_image, cv2.COLOR_BGR2RGB)
-
-    # 创建一个 overlay 图像
-    overlay = base_rgb.copy()
-
-    for label in np.unique(segmentation_mask):
-        if label == 0:
-            continue  # 不处理背景
-
-        color = color_map[(label - 1) % len(color_map)]
-        mask = segmentation_mask == label
-        overlay[mask] = (1 - alpha) * base_rgb[mask] + alpha * color
-
-    overlay = overlay.astype(np.uint8)
-    return numpy_to_qpixmap(overlay)
-    # h, w, ch = overlay.shape
-    # return QImage(overlay.data, w, h, ch * w, QImage.Format_RGB888).copy()
-
-
-def numpy_to_qpixmap(arr: np.ndarray) -> QPixmap:
-    h, w, ch = arr.shape
-    qimg = QImage(arr.data, w, h, ch * w, QImage.Format_RGB888)
-    return QPixmap.fromImage(qimg.copy())
-
-def qpixmap_to_numpy(pixmap: QPixmap) -> np.ndarray:
-    qimage = pixmap.toImage().convertToFormat(QImage.Format_RGB888)
-    width = qimage.width()
-    height = qimage.height()
-    ptr = qimage.bits()
-    ptr.setsize(width * height * 3)
-    arr = np.frombuffer(ptr, np.uint8).reshape((height, width, 3))
-    return arr.copy()  
-
-
-
 
 
 
@@ -356,23 +295,33 @@ class LabelPanel(QWidget):
         Convert a segmentation mask to a colored QPixmap with transparency, resized to canvas size.
         """
         if self.parent():
+            parent = self.parent().window()
+            
+            # Step 1: get the idx to visualize
+            segs_name_id_map = self.data.get_current_image_seg_map()
+            to_show_idx =[]
+            for i in range(parent.widget_segment_list.count()):
+                item = parent.widget_segment_list.item(i)
+                if item.checkState() == Qt.Checked:
+                    to_show_idx.append(segs_name_id_map[item.text()])
+
 
             
-            # Step 1: Resize to canvas size
+            # Step 2: Resize to canvas size
             seg_resized = cv2.resize(segmentation, (canvas_w, canvas_h), interpolation=cv2.INTER_NEAREST)
 
-            # Step 2: Define color map
-            parent = self.parent().window()
+            # Step 3: Define color map
+            
             color_map = parent.seg_colours_np
 
-            # Step 3: Create RGBA image
+            # Step 4: Create RGBA image
             rgba = np.zeros((canvas_h, canvas_w, 4), dtype=np.uint8)
             for label in np.unique(seg_resized):
-                if label == 0:
+                if label == 0 or label not in to_show_idx:
                     continue
                 rgba[seg_resized == label] = color_map[label % len(color_map)]
 
-            # Step 4: Convert to QImage and QPixmap
+            # Step 5: Convert to QImage and QPixmap
             qimage = QImage(rgba.data, canvas_w, canvas_h, 4 * canvas_w, QImage.Format_RGBA8888)
             return QPixmap.fromImage(qimage.copy())
         

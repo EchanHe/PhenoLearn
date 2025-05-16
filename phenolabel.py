@@ -112,18 +112,21 @@ class MainWindow(QMainWindow):
                             QColor(0,255,255,106), QColor(0,0,255,107)]
 
         self.seg_colours = [
-            QColor(220, 20, 60, 100),    # Crimson
-            QColor(255, 165, 0, 100),    # Orange
-            QColor(238, 232, 170, 100),  # Pale Goldenrod
-            QColor(255, 255, 0, 100),    # Yellow
-            QColor(0, 128, 0, 100),      # Green
             QColor(46, 139, 87, 100),    # Sea Green
-            QColor(0, 255, 255, 100),    # Cyan
+            
+            QColor(250, 20, 60, 100),    # Crimson
+            QColor(0, 128, 0, 100),      # Green
             QColor(0, 0, 255, 100),      # Blue
+            QColor(255, 165, 0, 100),    # Orange
             QColor(128, 0, 128, 100),    # Purple
-            QColor(255, 20, 147, 100),   # Deep Pink
+            QColor(0, 255, 255, 100),    # Cyan
+            QColor(255, 190, 190, 100),   # Deep Pink
             QColor(139, 69, 19, 100),    # Saddle Brown
-            QColor(128, 128, 128, 100)   # Gray
+            QColor(128, 128, 128, 100),  # Gray
+            QColor(255, 255, 0, 100),    # Yellow
+            QColor(0,102,204,  100)  # light Blue
+            
+                   
         ]
 
         
@@ -746,10 +749,11 @@ class MainWindow(QMainWindow):
                 QMessageBox.about(self, "No image data", "Please select a directory for your images.")
             
             else:
+                current_dir = self.data.work_dir
                 self.message_unsave()
                 options = QFileDialog.Options()
                 # fileName = QFileDialog.getOpenFileName(self, "Open File", QDir.currentPath())
-                file_name, _ = QFileDialog.getOpenFileName(self, 'Import as csv', '.',
+                file_name, _ = QFileDialog.getOpenFileName(self, 'Import as csv', current_dir,
                                                         'Files (*.csv)', options=options)
                 if file_name:
                     file_name = os.path.abspath(file_name)
