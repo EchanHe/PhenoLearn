@@ -14,12 +14,113 @@ import cv2
 
 font_info = QFont('Arial', 14)
 
+
+from PyQt5.QtGui import QImage
+import numpy as np
+import cv2
+
+def mask_overlay_on_image(original_image: np.ndarray, segmentation_mask: np.ndarray, alpha: float = 0.4) -> QImage:
+    """
+    将 segmentation mask overlay 到原图上，并返回 PyQt 可用的 QImage
+
+    Args:
+        original_image (np.ndarray): 原始图像（BGR格式）
+        segmentation_mask (np.ndarray): 单通道整数 mask，0 表示背景，不 overlay
+        alpha (float): overlay 的透明度（0-1）
+
+    Returns:
+        QImage: 可直接显示的图像
+    """
+
+    # 定义颜色表：8种 RGB 颜色
+    color_map = np.array([
+        [255, 0, 0],      # Red
+        [0, 255, 0],      # Green
+        [0, 0, 255],      # Blue
+        [255, 255, 0],    # Yellow
+        [255, 0, 255],    # Magenta
+        [0, 255, 255],    # Cyan
+        [255, 128, 0],    # Orange
+        [128, 0, 255],    # Purple
+    ], dtype=np.uint8)
+
+    # 转为 RGB（PyQt 用 RGB）
+    base_rgb = cv2.cvtColor(original_image, cv2.COLOR_BGR2RGB)
+
+    # 创建一个 overlay 图像
+    overlay = base_rgb.copy()
+
+    for label in np.unique(segmentation_mask):
+        if label == 0:
+            continue  # 不处理背景
+
+        color = color_map[(label - 1) % len(color_map)]
+        mask = segmentation_mask == label
+        overlay[mask] = (1 - alpha) * base_rgb[mask] + alpha * color
+
+    overlay = overlay.astype(np.uint8)
+    return numpy_to_qpixmap(overlay)
+    # h, w, ch = overlay.shape
+    # return QImage(overlay.data, w, h, ch * w, QImage.Format_RGB888).copy()
+
+
+def numpy_to_qpixmap(arr: np.ndarray) -> QPixmap:
+    h, w, ch = arr.shape
+    qimg = QImage(arr.data, w, h, ch * w, QImage.Format_RGB888)
+    return QPixmap.fromImage(qimg.copy())
+
+def qpixmap_to_numpy(pixmap: QPixmap) -> np.ndarray:
+    qimage = pixmap.toImage().convertToFormat(QImage.Format_RGB888)
+    width = qimage.width()
+    height = qimage.height()
+    ptr = qimage.bits()
+    ptr.setsize(width * height * 3)
+    arr = np.frombuffer(ptr, np.uint8).reshape((height, width, 3))
+    return arr.copy()  
+
+
+
+
+
+
+def make_brush_cursor(size: int, color: QColor = Qt.black, mode: str = "brush", alpha: int = 50) -> QCursor:
+    # Ensure the cursor has enough space
+    pixmap_size = size + 4  # some margin
+    pixmap = QPixmap(pixmap_size, pixmap_size)
+    pixmap.fill(Qt.transparent)
+
+    
+    painter = QPainter(pixmap)
+    
+    if mode == "brush":
+        # Semi-transparent fill color
+        fill_color = QColor(color)
+        fill_color.setAlpha(alpha)
+        
+        painter.setPen(color)
+        painter.setBrush(QBrush(fill_color))
+        
+        painter.drawEllipse(2, 2, size, size)
+        
+
+    elif mode == "erase":
+        painter.setPen(Qt.red)
+        painter.setBrush(Qt.transparent)
+        painter.drawEllipse(2, 2, size, size)
+    painter.end()
+    # Center the hotspot at the center of the circle
+    hotspot = QPoint(pixmap_size // 2, pixmap_size // 2)
+    return QCursor(pixmap, hotspot.x(), hotspot.y())
+
+
+
 class LabelPanel(QWidget):
     """The annotation or label panel
     
     Use QPixmap as the canvas
     """
-
+    brush_pixel_sizes = [6, 10, 20, 40]
+    
     def __init__(self,  data = None):
         super().__init__()
 
@@ -97,10 +198,32 @@ class LabelPanel(QWidget):
 
         self.update()
 
-    def get_brush_width(self):
+
+
+    def get_brush_idx(self):
         if self.parent():
             parent = self.parent().window()
+
             if parent.act_brush_0.isChecked():
+                return 0
+            elif parent.act_brush_1.isChecked():
+                return 1
+            elif parent.act_brush_2.isChecked():
+                return 2
+            elif parent.act_brush_3.isChecked():
+                return 3
+            elif parent.act_brush_custom.isChecked():
+                return -1
+            else:
+                return 0
+        else:
+            return 0
+        
+    def get_brush_width_old(self):
+        if self.parent():
+            parent = self.parent().window()
+
+            if parent.act_brush_0.isChecked():               
                 return 5
             elif parent.act_brush_1.isChecked():
                 return 10
@@ -113,6 +236,50 @@ class LabelPanel(QWidget):
 
         else:
             return 5
+
+    def get_brush_width(self):
+        return self.get_current_brush_size()
+
+    def get_current_brush_pixel_size(self):
+        brush_id = self.get_brush_idx()
+        if brush_id == -1:
+            # Custom size
+            if self.parent():
+                parent = self.parent().window()
+                return parent.spin_brush_size.value()
+            else:
+                return 10
+        else:
+            # Predefined sizes
+            return self.brush_pixel_sizes[brush_id]
+    
+    def get_current_brush_size(self):
+        """Get the current brush size
+
+        Returns:
+            int: The current brush size
+        """
+        brush_id = self.get_brush_idx()
+        if brush_id == -1:
+            # Custom size
+            if self.parent():
+                parent = self.parent().window()
+                pixel_size =  parent.spin_brush_size.value()
+            else:
+                pixel_size =  10
+        else:
+            # Predefined sizes
+            pixel_size = self.brush_pixel_sizes[brush_id]
+    
+    
+        scale = self.data.scale
+
+        brush_size = int(pixel_size * scale)
+        if brush_size<1:
+            brush_size = 1
+        
+        return brush_size
+
 
     def get_brush_cate(self):
         if self.parent():
@@ -137,7 +304,91 @@ class LabelPanel(QWidget):
             self.state_place_outline =  parent.act_outline_mode.isChecked()
             self.state_place_pt = parent.act_point_mode.isChecked()
 
+    def map_display_to_image_coords(self, pos):
+        """
+        Convert mouse position on the QWidget to image coordinates.
+        
+        Args:
+            pos (QPoint): position from mouseEvent.pos()
 
+        Returns:
+            (x_img, y_img): int coordinates on original image
+        """
+        scale = self.data.scale
+        x_display = pos.x()
+        y_display = pos.y()
+
+        x_img = int(x_display / scale)
+        y_img = int(y_display / scale)
+
+        h, w = self.data.current_mask.shape[:2]
+        # Clip to bounds
+        x_img = min(max(x_img, 0), w - 1)
+        y_img = min(max(y_img, 0), h - 1)
+
+        return x_img, y_img
+
+
+
+    def apply_brush(self, pos, value ):
+        """Apply a brush to the image at the given coordinates.
+        """
+        image_x, image_y = self.map_display_to_image_coords(pos)
+        # Create a mask for the brush
+        cv2.circle(self.data.current_mask, (image_x, image_y), self.get_current_brush_pixel_size()//2, color=int(value), thickness=-1)
+
+    def apply_line_on_mask(self, p1, p2, value ):
+        """Draw a line on the mask between two points.
+        """
+   
+        x1, y1 = self.map_display_to_image_coords(p1)
+        x2, y2  = self.map_display_to_image_coords(p2)
+        
+        # draw line with brush thickness
+        cv2.line(self.data.current_mask, 
+                 (x1, y1), (x2, y2),
+                 color=int(value), 
+                 thickness=self.get_current_brush_pixel_size())
+
+    def segmentation_to_pixmap(self,
+                               segmentation: np.ndarray, canvas_w: int, canvas_h: int) -> QPixmap:
+        """
+        Convert a segmentation mask to a colored QPixmap with transparency, resized to canvas size.
+        """
+        if self.parent():
+
+            
+            # Step 1: Resize to canvas size
+            seg_resized = cv2.resize(segmentation, (canvas_w, canvas_h), interpolation=cv2.INTER_NEAREST)
+
+            # Step 2: Define color map
+            parent = self.parent().window()
+            color_map = parent.seg_colours_np
+
+            # Step 3: Create RGBA image
+            rgba = np.zeros((canvas_h, canvas_w, 4), dtype=np.uint8)
+            for label in np.unique(seg_resized):
+                if label == 0:
+                    continue
+                rgba[seg_resized == label] = color_map[label % len(color_map)]
+
+            # Step 4: Convert to QImage and QPixmap
+            qimage = QImage(rgba.data, canvas_w, canvas_h, 4 * canvas_w, QImage.Format_RGBA8888)
+            return QPixmap.fromImage(qimage.copy())
+        
+
+    def update_canvas(self):
+        print("when mouse release, updat the canvas using the self.current mask")
+        pixmap = self.segmentation_to_pixmap(self.data.current_mask, 
+                                             self.canvas.width(), self.canvas.height())
+        # Then paint it:
+        painter = QPainter(self.canvas)
+        painter.setCompositionMode(QPainter.CompositionMode_Source)
+        painter.drawPixmap(0, 0, pixmap)
+        painter.end()
+
+
+        
     def mousePressEvent(self, e):
         """_summary_
 
@@ -176,10 +427,19 @@ class LabelPanel(QWidget):
             # Draw contour
             if self.state_place_outline and (self.contour_colour is not None) and (self.contour_name is not None):
                 # self.draw_on_mask(pos.x(), pos.y(), brush_size=self.get_brush_width(), seg = self.get_brush_cate())
+                
                 self.draw_on_mask_v2(pos, pos, brush_size=self.get_brush_width(), seg = self.get_brush_cate())
+                if self.get_brush_cate() ==1:
+                    segs_name_id_map = self.data.get_current_image_seg_map()
+                    idx = segs_name_id_map[self.contour_name]
+                    self.apply_brush(pos, idx)
+                else:
+                    self.apply_brush(pos, 0)
+                
                 self.state_drawing_contour = True
                 
                 self.last_pos = pos
+                
                 # p.drawPixmap(0,0, self.pixmap)
                 # p.drawPixmap(0,0, self.canvas)
                 # # self.data.set_current_segment_of_current_img(pos.x(), pos.y(), self.get_brush_width(), seg = self.get_brush_cate())
@@ -217,12 +477,19 @@ class LabelPanel(QWidget):
                 # # Update contour in relabel data
                 # self.data.trans_current_segment_to_contour(self.canvas, self.contour_name)
                 # self.data.trans_current_segment_to_contour_cv(self.canvas, self.contour_name, self.contour_colour)
-                self.data.trans_current_segment_to_contour_with_map(self.canvas, self.contour_name)
+                
+                
+                # self.data.trans_current_segment_to_contour_with_map(self.canvas, self.contour_name)
+
+                self.update_canvas()
+                self.data.save_as_countours()
 
             self.last_pos = None
 
         self.update_in_parent(pos)
         self.update()
+
+
 
     def mouseMoveEvent(self, e):
         # update the annotation mode
@@ -246,10 +513,21 @@ class LabelPanel(QWidget):
         #     self.draw_on_mask(pos.x(), pos.y() ,brush_size=self.get_brush_width(), seg = self.get_brush_cate())
         #     # self.data.set_current_segment_of_current_img(pos.x(), pos.y(), self.get_brush_width(), seg = self.get_brush_cate())
 
-        if self.state_place_outline and e.buttons() == Qt.LeftButton:
+        if self.state_place_outline and e.buttons() == Qt.LeftButton \
+            and (self.contour_colour is not None) and (self.contour_name is not None):
             # Drawing contour
             # self.draw_on_mask(pos.x(), pos.y() ,brush_size=self.get_brush_width(), seg = self.get_brush_cate())
             self.draw_on_mask_v2(self.last_pos, pos ,brush_size=self.get_brush_width(), seg = self.get_brush_cate())
+            
+            if self.get_brush_cate() ==1:
+                segs_name_id_map = self.data.get_current_image_seg_map()
+                idx = segs_name_id_map[self.contour_name]
+                
+                self.apply_line_on_mask(self.last_pos, pos, idx)
+            else:
+                self.apply_line_on_mask(self.last_pos, pos, 0)
+            
+
             self.last_pos = pos
             # self.data.set_current_segment_of_current_img(pos.x(), pos.y(), self.get_brush_width(), seg = self.get_brush_cate())
 
@@ -327,11 +605,10 @@ class LabelPanel(QWidget):
             self.canvas = self.canvas.scaled(img_size , aspectRatioMode    = Qt.IgnoreAspectRatio)
             painter.drawPixmap(0,0, self.canvas)
 
-
-
-
         else:
             painter.eraseRect(self.rect())
+
+    
     def draw_image(self,painter):
 
         self.pixmap = self.data.get_current_scaled_pixmap()
@@ -528,8 +805,10 @@ class LabelPanel(QWidget):
         p_mask.drawLine(start_pos, end_pos)
 
 
+
     def draw_init_mask(self, items ,  colors):
         """
+        called in update_segment_drawing()
 
         :param color: dict of seg idx: segment contours
         :return:
@@ -590,21 +869,47 @@ class LabelPanel(QWidget):
         """zoom in the image
         """
         self.data.set_scale(1.25)
+
+        
+        
+        self.update_brush_cursor()
         self.update()
 
     def zoom_out(self):
         """zoom out the image
-        """
+        """       
         self.data.set_scale(0.8)
+        self.update_brush_cursor()
         self.update()
 
     def origin(self):
         """set to the original scale
         """
         self.data.reset_scale()
+        self.update_brush_cursor()
         self.update()
 
 
+
+
+    def update_brush_cursor(self):
+        self.get_annotation_mode()
+        if self.state_place_outline:
+            try:
+                brush_size = self.get_current_brush_size()
+                if self.get_brush_cate() == 1:
+                    if self.contour_colour is not None:
+                        cursor = make_brush_cursor(size = brush_size, color = self.contour_colour)
+                    else:
+                        cursor = make_brush_cursor(size = brush_size)
+                else:
+                    cursor = make_brush_cursor(size = brush_size,  mode = "erase")
+                self.setCursor(cursor)
+            except Exception as e:
+                print("Error in update_brush_cursor: ", e)
+                self.unsetCursor()
+        else:
+            self.unsetCursor()
     def open_state_moving(self):
         self.state_moving = True
 

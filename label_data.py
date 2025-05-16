@@ -790,6 +790,7 @@ class Data():
 
     def set_current_image_current_mask(self):
         """init the current mask. 
+        called in list_seg_name
         If there are contour_cv in this mask, update it too.
         """
         if self.current_mask is not None:
@@ -816,7 +817,6 @@ class Data():
                         idx = segs_name_id_map[key]
                         cv2.fillPoly(self.current_mask, contour_cv, int(idx))
                     
-            
 
 
     # To be removed
@@ -968,8 +968,11 @@ class Data():
         arr = np.fromstring(s, dtype=np.uint8).reshape((image.height(),image.width() ,4))
 
         new_mask = (arr[:,:,3] !=0)
+        print("prop before resizing",np.sum(new_mask!=0)/np.sum(new_mask==0))
         new_mask = cv2.resize(new_mask.astype('uint8'), 
                                 (width , height), interpolation=cv2.INTER_NEAREST)
+        
+        print("prop after resizing",np.sum(new_mask!=0)/np.sum(new_mask==0))
         new_mask = new_mask.astype(bool)
         
         old_mask = (self.current_mask!=0)
@@ -994,14 +997,39 @@ class Data():
 
 
         contours, hierarchy = cv2.findContours(thresh,cv2.RETR_TREE,cv2.CHAIN_APPROX_SIMPLE)
-
+        
 
         contours = [contour.tolist() for contour in contours]
+        print(f"{segment_name} contours: {contours}")
         self.get_current_image_segments_cv()[segment_name]['contours'] = contours
         
         self.changed=True
         
         print(f"mask ids: {np.unique(self.current_mask)}")
+
+    def save_as_countours(self):
+        
+        unique_labels = np.unique(self.current_mask)
+        unique_labels = unique_labels[unique_labels != 0]  # skip background (0)
+
+        segs_id_name_map = {v: k for k, v in self.get_current_image_seg_map().items()}
+        print(segs_id_name_map)
+
+        for label in unique_labels:
+            # Create binary mask for this class
+            binary_mask = (self.current_mask == label).astype(np.uint8)
+
+            # Find contours
+            contours, _ = cv2.findContours(binary_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+            contours = [contour.tolist() for contour in contours]
+            
+            self.get_current_image_segments_cv()[segs_id_name_map[label]]['contours'] = contours
+            
+        self.changed=True
+            # print(f"Class {label}: found {len(contours)} contour(s)")
+            # print(segs_id_name_map[label])
+
 
     def close_current_segment(self, segment, segment_name, contour_colour):
         """Auto fill closed outlines that were drawn on the segmetnation.
@@ -1043,6 +1071,20 @@ class Data():
         contours = [contour.tolist() for contour in contours]
         self.get_current_image_segments_cv()[segment_name]['contours'] = contours
 
+    def fill_current_mask_current_seg_name(self, segment_name):
+        segs_name_id_map = self.get_current_image_seg_map()
+        idx = segs_name_id_map[segment_name]
+        
+        mask = (self.current_mask==idx).astype('uint8')*100
+
+        _,thresh = cv2.threshold(mask,1,255,0)
+        contours, hierarchy = cv2.findContours(thresh,cv2.RETR_TREE,cv2.CHAIN_APPROX_SIMPLE)
+
+
+        for contour in contours:
+            cv2.fillPoly(self.current_mask, [contour], int(idx))
+
+        self.save_as_countours()
 
     def close_current_segment_map(self, segment_name):
         """Auto fill closed outlines that were drawn on the segmetnation.

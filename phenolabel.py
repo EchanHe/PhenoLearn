@@ -126,6 +126,19 @@ class MainWindow(QMainWindow):
             QColor(128, 128, 128, 100)   # Gray
         ]
 
+        
+        def qcolors_to_rgba_array(qcolor_list):
+            rgba_array = np.array([
+                [c.red(), c.green(), c.blue(), c.alpha()]
+                for c in qcolor_list
+            ], dtype=np.uint8)
+            return rgba_array
+        
+        self.seg_colours_np = qcolors_to_rgba_array(self.seg_colours)
+
+        
+
+
         self.data = Data_gui()
 
 
@@ -455,19 +468,34 @@ class MainWindow(QMainWindow):
         self.act_brush_1 = QAction("M", self, checkable=True)
         self.act_brush_2 = QAction("L", self, checkable=True)
         self.act_brush_3 = QAction("XL", self, checkable=True)
+        
+        self.act_brush_custom = QAction("Custom", self, checkable=True)
+
 
         self.act_brush_1.setChecked(True)
 
         self.act_group_brushes = QActionGroup(self)
+        
+        self.act_group_brushes.triggered.connect(self.update_brush)
 
         self.act_group_brushes.addAction(self.act_brush_0)
         self.act_group_brushes.addAction(self.act_brush_1)
         self.act_group_brushes.addAction(self.act_brush_2)
         self.act_group_brushes.addAction(self.act_brush_3)
+        
+        self.act_group_brushes.addAction(self.act_brush_custom)
 
 
+        self.spin_brush_size = QSpinBox()
+        self.spin_brush_size.setMinimum(1)
+        self.spin_brush_size.setMaximum(9999)  # will update later based on canvas
+        self.spin_brush_size.setValue(10)
+        self.spin_brush_size.setEnabled(False)  # disabled unless "Custom" is selected
+
+        self.spin_brush_size.valueChanged.connect(self.custom_brush_size_changed)
 
         self.act_group_brush_cate = QActionGroup(self)
+        self.act_group_brush_cate.triggered.connect(self.update_brush)
         self.act_group_brush_cate.addAction(self.act_brush_object)
         self.act_group_brush_cate.addAction(self.act_brush_erase)
         self.act_group_brush_cate.addAction(self.act_fill_mask)
@@ -548,6 +576,8 @@ class MainWindow(QMainWindow):
         self.label_brush_size = QLabel("Brush Size:")
         self.toolbar_outline.addWidget(self.label_brush_size )
         self.toolbar_outline.addActions(self.act_group_brushes.actions())
+        
+        self.toolbar_outline.addWidget(self.spin_brush_size )
 
         self.toolbar_outline.hide()
         
@@ -950,12 +980,18 @@ class MainWindow(QMainWindow):
             self.toolbar_outline.show()
             # change to segmentation tab
             self.widget_anno_tabs.setCurrentIndex(1)
+            
+            
+
 
         elif(self.act_point_mode.isChecked()):
             self.widget_anno_tabs.setCurrentIndex(0)
             self.toolbar_outline.hide()
+
         else:
             self.toolbar_outline.hide()
+
+        self.widget_annotation.update_brush_cursor()
 
 
     def list_file_names(self):
@@ -1162,6 +1198,7 @@ class MainWindow(QMainWindow):
         # self.widget_segment_combobox.clear()
         
         self.data.set_current_image_current_mask()
+        
 
         segs_name_id_map = self.data.get_current_image_seg_map()
         if (segs_name_id_map is not None) and segs_name_id_map:
@@ -1320,6 +1357,9 @@ class MainWindow(QMainWindow):
             self.widget_annotation.contour_colour = None
             self.widget_annotation.contour_name = None
 
+        self.widget_annotation.update_brush_cursor()
+        self.widget_annotation.update()
+        # self.update_brush()
 
 
     def eventFilter(self, source, event):
@@ -1498,7 +1538,7 @@ class MainWindow(QMainWindow):
             self.widget_annotation.update()
 
 
-    def auto_fill(self):
+    def auto_fill_old(self):
         """
         Auto fill the current segmentation
         :return:
@@ -1509,6 +1549,17 @@ class MainWindow(QMainWindow):
 
             # self.data.close_current_segment(self.widget_annotation.canvas, self.widget_segment_list.currentItem().text(), cur_color)
             self.data.close_current_segment_map( self.widget_segment_list.currentItem().text())
+            self.update_segment_drawing()
+        except Exception as e:
+            print(e)
+
+    def auto_fill(self):
+        """
+        Auto fill the current segmentation
+        :return:
+        """
+        try:
+            self.data.fill_current_mask_current_seg_name( self.widget_segment_list.currentItem().text())
             self.update_segment_drawing()
         except Exception as e:
             print(e)
@@ -1526,8 +1577,31 @@ class MainWindow(QMainWindow):
                 else:
                     QMessageBox.about(self, "Failed", "Fail to add the label\nname is duplicate.")
 
+    def update_brush(self, action):
+        print(action)
+        if action == self.act_brush_custom:
+            self.spin_brush_size.setEnabled(True)
+        elif action == self.act_brush_0:
+            self.spin_brush_size.setEnabled(False)
+            self.spin_brush_size.setValue(self.widget_annotation.brush_pixel_sizes[0])
+        elif action == self.act_brush_1:
+            self.spin_brush_size.setEnabled(False)
+            self.spin_brush_size.setValue(self.widget_annotation.brush_pixel_sizes[1])
+        elif action == self.act_brush_2:
+            self.spin_brush_size.setEnabled(False)
+            self.spin_brush_size.setValue(self.widget_annotation.brush_pixel_sizes[2])
+        elif action == self.act_brush_3:
+            self.spin_brush_size.setEnabled(False)
+            self.spin_brush_size.setValue(self.widget_annotation.brush_pixel_sizes[3])
             
-
+        self.widget_annotation.update_brush_cursor()
+        self.widget_annotation.update()
+        
+        
+    def custom_brush_size_changed(self, value):
+        self.widget_annotation.update_brush_cursor()
+        self.widget_annotation.update()
+    
     def delete_segmentation(self):
         """Delete the segmentation
         """
@@ -1627,7 +1701,7 @@ class MainWindow(QMainWindow):
 
         self.list_point_name()
 
-    def update_segment_drawing(self):
+    def update_segment_drawing_old(self):
         """
         Update segmentation on the image.
         Paint, erase or ticked segmentation
@@ -1637,6 +1711,8 @@ class MainWindow(QMainWindow):
         :return:
         """
         self.widget_annotation.reset_mask()
+        
+        
         items = []
         # colors = []
         colors = {}
@@ -1654,9 +1730,25 @@ class MainWindow(QMainWindow):
                 # colors[i_item] = self.seg_colours[i_item%len(self.seg_colours)]
                 # colors.append(self.seg_colours[i_item%len(self.seg_colours)])
 
-        self.widget_annotation.draw_init_mask(items, colors)
+        # self.widget_annotation.draw_init_mask(items, colors)
         # self.widget_annotation.draw_init_mask(colors)
         self.widget_annotation.update()
+
+
+    def update_segment_drawing(self):
+            """
+            Update segmentation on the image.
+            Paint, erase or ticked segmentation
+
+            event: clicking the segmentation panel
+
+            :return:
+            """
+            self.widget_annotation.reset_mask()
+            self.widget_annotation.update_canvas()
+            self.widget_annotation.update_brush_cursor()
+
+            self.widget_annotation.update()
 
     def menu_point_list(self,position):
         """Currently deprecated
