@@ -52,6 +52,28 @@ def make_brush_cursor(size: int, color: QColor = Qt.black, mode: str = "brush", 
     return QCursor(pixmap, hotspot.x(), hotspot.y())
 
 
+def make_point_cursor(radius=4, color=Qt.red) -> QCursor:
+    size = radius * 4
+    pixmap = QPixmap(size, size)
+    pixmap.fill(Qt.transparent)
+
+    painter = QPainter(pixmap)
+    painter.setRenderHint(QPainter.Antialiasing)
+    painter.setPen(QPen(color, 1))
+    painter.setBrush(QColor(color))
+
+    center = QPoint(size // 2, size // 2)
+    painter.drawEllipse(center, radius, radius)
+
+    # cross
+    painter.setPen(QPen(color, 1))
+    painter.drawLine(center.x(), 0, center.x(), size)
+    painter.drawLine(0, center.y(), size, center.y())
+
+    painter.end()
+
+    return QCursor(pixmap, center.x(), center.y())
+
 
 class LabelPanel(QWidget):
     """The annotation or label panel
@@ -100,6 +122,8 @@ class LabelPanel(QWidget):
         self.canvas = QPixmap(self.rect().width() , self.rect().height())
         color = QColor(0, 0, 0, 0)
         self.canvas.fill(color)
+
+        self.pt_cursor = make_point_cursor(radius=4, color=Qt.red)
 
         ## The numpy format of the segmentation
         # self.segmentation
@@ -857,8 +881,7 @@ class LabelPanel(QWidget):
             except Exception as e:
                 print("Error in update_brush_cursor: ", e)
                 self.unsetCursor()
-        else:
-            self.unsetCursor()
+
     def open_state_moving(self):
         self.state_moving = True
 

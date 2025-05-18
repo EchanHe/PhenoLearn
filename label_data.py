@@ -266,6 +266,9 @@ class Image():
 
     def get_current_highlight_bbox(self, scale= None):
         if self.current_highlight_key is not None:
+            if self.current_highlight_key not in self.points_dict:
+                self.current_highlight_key = None
+                return None
             if scale is not None:
                 return (self.points_dict[self.current_highlight_key] * scale).rect
             else:
@@ -576,7 +579,9 @@ class Data():
         Args:
             df (_type_): Import csv dataframe
         """
+        self.reset_all_pts()
         
+        df = df.fillna(-1)
         cols = df.columns
         col_names = [col.split("_")[0] for col in cols]
         col_names = pd.unique(col_names)
@@ -1343,6 +1348,18 @@ class Data():
         """
         self.filtered_img_idx = np.array(list(self.images.keys()))
 
+    def reset_all_pts(self):
+        """Reset all points in the current image
+        """
+        for img_idx, img_item in self.images.items():
+            img_item.points_dict = {}
+            img_item.set_current_pt_key_to_start()
+            self.images[img_idx].set_current_pt_key_to_start()
+
+    def reset_all_seg(self):
+        for img_idx, img_item in self.images.items():
+            img_item.segments_cv = {}
+        self.segs_name_id_map = {}
 
     def write_json(self, save_name = None):
         # Create data form to save
@@ -1377,19 +1394,27 @@ class Data():
         Args:
             dir (_type_): The folder to save the masks
         """        
-        key_of_contour = list(self.seg_names)[0]
+        # key_of_contour = list(self.seg_names)[0]
         
         for img_idx, img_item in self.images.items():
             img_temp = cv2.imread(os.path.join(self.work_dir, img_idx))
             mask_temp = np.zeros(img_temp.shape)
             
+            for seg_name, value in img_item.segments_cv.items():
+                seg_id = self.get_current_image_seg_map()[seg_name]
+                contours = value['contours']
+                
+                if contours:
+                    contours = [np.array(contour, dtype='int32') for contour in contours]
+                    cv2.fillPoly(mask_temp, contours, color=int(seg_id))
             
-            if key_of_contour in img_item.segments_cv:
-                contour_cv= img_item.segments_cv[key_of_contour]['contours']
+            
+            # if key_of_contour in img_item.segments_cv:
+            #     contour_cv= img_item.segments_cv[key_of_contour]['contours']
             
             
-                contour_cv = [np.array(contour, dtype='int32') for contour in contour_cv]
-                cv2.fillPoly(mask_temp, contour_cv, (255,255,255))
+            #     contour_cv = [np.array(contour, dtype='int32') for contour in contour_cv]
+            #     cv2.fillPoly(mask_temp, contour_cv, (255,255,255))
             
             cv2.imwrite(os.path.join(dir, img_idx), mask_temp)
 
@@ -1444,6 +1469,7 @@ class Data_gui(Data, QObject):
     signal_data_changed = pyqtSignal(bool)
     signal_has_images = pyqtSignal()
     signal_has_undo = pyqtSignal(bool)
+    signal_progress_updated = pyqtSignal(int)
 
     # push in edit, remove and add
     undo_stack = []

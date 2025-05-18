@@ -2,6 +2,28 @@
 
 **PhenoLearn** is an open-source image analysis tool that is designed for high-throughput phenotype measuring on digital biodiversity datasets. It can (i) generates annotations (ii) use deep learning models to generate annotations (iii) Review predictions.
 
+## Update (2025/05/18)
+
+### Publication Announcement
+Our paper introducing **PhenoLearn** has been published in the _Journal of Evolutionary Biology_!  
+**"PhenoLearn: A user-friendly toolkit for image annotation and deep learning-based phenotyping of biological datasets"**  
+
+[Read the paper here](https://doi.org/10.1093/jeb/voaf058)
+
+### Video Tutorial
+A short **2-minute video tutorial** for PhenoLabel (the annotation component of PhenoLearn) is available:  
+[Watch the tutorial here](https://youtu.be/-sEv-VdUH_c)
+
+### Latest Windows Executable
+The latest Windows .exe (built on 2025/05/18) can be downloaded [here](https://zenodo.org/records/15459252)
+
+### Major Features updates:
+
+-   **Support for exporting segmentation masks** with **multiple segmentation classes**
+    
+-   **Customizable brush size**
+
+
 ## Table of Contents
 -   [Features](#features)
 -   [Installation](#installation)

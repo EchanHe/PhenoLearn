@@ -175,7 +175,9 @@ class MainWindow(QMainWindow):
 
 
         self.button_review_sort = QPushButton('Sort')
-        self.button_review_sort.clicked.connect(self.review_sort)
+        self.button_review_sort.setCheckable(True)
+        self.button_review_sort.toggled.connect(self.review_sort)
+        # self.button_review_sort.clicked.connect(self.review_sort)
         self.button_review_reset= QPushButton('Reset')
         self.button_review_reset.clicked.connect(self.review_reset)
 
@@ -326,6 +328,8 @@ class MainWindow(QMainWindow):
         self.data.signal_data_changed.connect(self.update_file_label)
         self.data.signal_has_images.connect(self.update_menu_has_imgs)
         self.data.signal_has_undo.connect(self.update_menu_undo)
+        
+        # self.data.signal_progress_updated.connect(self.update_progress)
 
 
         self.widget_annotation = label_panel.LabelPanel(self.data)
@@ -773,6 +777,7 @@ class MainWindow(QMainWindow):
                             self.data.import_segs(df_data)
                             
                         if mode=="pt":
+                        
                             self.data.import_pts(df_data)
                             
                         # deprecated function     
@@ -785,7 +790,7 @@ class MainWindow(QMainWindow):
         except Exception as e:
             print(e)
             
-            QMessageBox.warning(self,"Warning" , str(e))
+            QMessageBox.warning(self,"Import Warning" , str(e))
 
     def import_img_seg(self):
         """Open a directory and import images that have the same names from data images as the segmentation
@@ -965,7 +970,7 @@ class MainWindow(QMainWindow):
         else:
             # print("s")   
             try:
-                assert len(self.data.seg_names) == 1, "Export segmentation into images only works for one-class segmentation"
+                # assert len(self.data.seg_names) == 1, "Export segmentation into images only works for one-class segmentation"
                 defaultOpenDirPath = os.path.dirname(self.file_path) if self.file_path else '.'  
                 dir = (QFileDialog.getExistingDirectory(self,
                                                                 'Open dir for images', defaultOpenDirPath,
@@ -975,27 +980,30 @@ class MainWindow(QMainWindow):
                     self.data.write_mask(dir)
 
             except Exception as e:           
-                QMessageBox.warning(self,"Warning" , str(e))
+                QMessageBox.warning(self,"Export Warning" , str(e))
             
     def mode_choosing(self):
         """view, point or seg modes
         """    
+        self.widget_annotation.unsetCursor()
         if(self.act_outline_mode.isChecked()):
             self.toolbar_outline.show()
             # change to segmentation tab
             self.widget_anno_tabs.setCurrentIndex(1)
             
-            
+            self.widget_annotation.update_brush_cursor()
 
 
         elif(self.act_point_mode.isChecked()):
             self.widget_anno_tabs.setCurrentIndex(0)
             self.toolbar_outline.hide()
+            
+            self.widget_annotation.setCursor(self.widget_annotation.pt_cursor)
 
         else:
             self.toolbar_outline.hide()
 
-        self.widget_annotation.update_brush_cursor()
+        
 
 
     def list_file_names(self):
@@ -1010,9 +1018,13 @@ class MainWindow(QMainWindow):
                 #     self.widget_file_list.addItem(img.img_name)
                 # for img_name,_ in self.data.images.items():
                 #     self.widget_file_list.addItem(img_name)
-                sorted_img_names = sorted(self.data.img_id_order)
-                for img_name in sorted_img_names:
-                    self.widget_file_list.addItem(img_name)
+                if not self.button_review_sort.isChecked():
+                    sorted_img_names = sorted(self.data.img_id_order)
+                    for img_name in sorted_img_names:
+                        self.widget_file_list.addItem(img_name)
+                else:
+                    for img_name in self.data.img_id_order:
+                        self.widget_file_list.addItem(img_name)
 
                 self.widget_annotation.has_no_hidden = self.hide_file_names()
 
@@ -1091,15 +1103,15 @@ class MainWindow(QMainWindow):
         self.list_file_names()
         self.widget_annotation.update()
 
-    def review_sort(self):
+    def review_sort(self, checked):
         """Review assistant function: Sorting
         
         Sort the images by selected properties.
         Update file list and annotation panel
         """        
         if self.widget_review_assist_sorting_box.count()>0:
-
-            self.data.sort_by_value(self.widget_review_assist_sorting_box.currentText())
+            if checked:
+                self.data.sort_by_value(self.widget_review_assist_sorting_box.currentText())
             self.list_file_names()
             self.widget_annotation.update()
 
@@ -1684,6 +1696,7 @@ class MainWindow(QMainWindow):
 
     def update_menu_undo(self, changed):
         self.act_undo.setEnabled(changed)
+
 
 
     def sort_file_names(self):
