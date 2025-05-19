@@ -560,6 +560,7 @@ class Data():
         Args:
             df (_type_): Import csv dataframe
         """        
+        self.reset_all_seg()
         for idx, row in df.iterrows():
             seg_dict={}
             #if the file name appear in the dataset directory
@@ -570,10 +571,10 @@ class Data():
                         # contours = 
                         seg_dict[col]= {"contours" : eval(row[col])}
                         # seg_dict[col]["contours"] = eval(row[col])
-
-
+                    self.add_seg_map_for_give_img(col , idx)
                 self.images[idx].segments_cv = seg_dict
                 self.seg_names.add(col)
+                
 
     def import_pts(self, df):
         """Read the dataframe(csv) and assign points to images
@@ -779,6 +780,23 @@ class Data():
             return True
         else:
             return False
+
+    def add_seg_map_for_give_img(self, seg_name, img_idx):
+        file_name = img_idx
+        if file_name not in self.segs_name_id_map:
+            self.segs_name_id_map[file_name] = {}  # Initialize empty dict for this file
+
+        # Assign new ID: If the dictionary is empty, start from 1, otherwise, max_id + 1
+        if not self.segs_name_id_map[file_name]:
+            new_id = 1
+        else:
+            new_id = max(self.segs_name_id_map[file_name].values()) + 1
+
+        # Assign the ID to the seg_name
+        self.segs_name_id_map[file_name][seg_name] = np.uint8(new_id)  # Store as uint8
+        print(f"adding new {new_id}, now mapping is: {self.segs_name_id_map}")
+
+
 
     def add_seg_map_for_current_img(self, seg_name):
         file_name = self.get_current_image_name()
