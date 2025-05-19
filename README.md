@@ -15,7 +15,7 @@ A short **2-minute video tutorial** for PhenoLabel (the annotation component of 
 [Watch the tutorial here](https://youtu.be/-sEv-VdUH_c)
 
 ### Latest Windows Executable
-The latest Windows .exe (built on 2025/05/18) can be downloaded [here](https://zenodo.org/records/15459252)
+The latest Windows .exe (built on 2025/05/18) can be found in the [latest release](https://github.com/EchanHe/PhenoLearn/releases)
 
 ### Major Features updates:
 
