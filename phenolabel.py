@@ -1753,19 +1753,19 @@ class MainWindow(QMainWindow):
 
 
     def update_segment_drawing(self):
-            """
-            Update segmentation on the image.
-            Paint, erase or ticked segmentation
+        """
+        Update segmentation on the image.
+        Paint, erase or ticked segmentation
 
-            event: clicking the segmentation panel
+        event: clicking the segmentation panel
 
-            :return:
-            """
-            self.widget_annotation.reset_mask()
-            self.widget_annotation.update_canvas()
-            self.widget_annotation.update_brush_cursor()
+        :return:
+        """
+        self.widget_annotation.reset_mask()
+        self.widget_annotation.update_canvas()
+        self.widget_annotation.update_brush_cursor()
 
-            self.widget_annotation.update()
+        self.widget_annotation.update()
 
     def menu_point_list(self,position):
         """Currently deprecated

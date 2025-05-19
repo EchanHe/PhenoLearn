@@ -14,6 +14,8 @@ import cv2
 
 from util import phenolearn_io
 
+from datetime import datetime
+
 pixmap_max_size_limit = QSize(1300,700)
 pixmap_min_size_limit = QSize(400,200)
 
@@ -1025,7 +1027,7 @@ class Data():
             binary_mask = (self.current_mask == label).astype(np.uint8)
 
             # Find contours
-            contours, _ = cv2.findContours(binary_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            contours, _ = cv2.findContours(binary_mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
 
             contours = [contour.tolist() for contour in contours]
             
@@ -1398,10 +1400,11 @@ class Data():
         
         for img_idx, img_item in self.images.items():
             img_temp = cv2.imread(os.path.join(self.work_dir, img_idx))
-            mask_temp = np.zeros(img_temp.shape)
+            h, w = img_temp.shape[:2]
+            mask_temp = np.zeros((h, w), dtype=np.uint8)
             
             for seg_name, value in img_item.segments_cv.items():
-                seg_id = self.get_current_image_seg_map()[seg_name]
+                seg_id = self.segs_name_id_map[img_idx][seg_name]
                 contours = value['contours']
                 
                 if contours:
@@ -1415,8 +1418,17 @@ class Data():
             
             #     contour_cv = [np.array(contour, dtype='int32') for contour in contour_cv]
             #     cv2.fillPoly(mask_temp, contour_cv, (255,255,255))
-            
-            cv2.imwrite(os.path.join(dir, img_idx), mask_temp)
+
+            # Build filename with '_mask' suffix
+            name, _ = os.path.splitext(img_idx)
+            mask_filename = f"{name}_mask.png"  # Always save as PNG
+            mask_path = os.path.join(dir, mask_filename)
+
+            cv2.imwrite(mask_path, mask_temp)
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        with open(os.path.join(dir, f"seg_name_id_{timestamp}.txt"), "w") as f:
+            for key, val in self.segs_name_id_map.items():
+                f.write(f"{key}:{val}\n")
 
     def import_mask(self, dir,seg_name):
         """Read images in the dir, and turn the mask into segmentation in the data

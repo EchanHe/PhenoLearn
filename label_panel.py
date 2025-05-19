@@ -781,7 +781,8 @@ class LabelPanel(QWidget):
 
     def draw_init_mask(self, items ,  colors):
         """
-        called in update_segment_drawing()
+        currently not been called
+        before called in update_segment_drawing()
 
         :param color: dict of seg idx: segment contours
         :return:
