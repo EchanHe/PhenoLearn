@@ -409,6 +409,13 @@ class MainWindow(QMainWindow):
             set_widget_font_size(a, offset=2)
 
 
+        self.loading_msg = QMessageBox(self)
+        self.loading_msg.setWindowTitle("Please wait")
+        self.loading_msg.setText("")
+        self.loading_msg.setStandardButtons(QMessageBox.NoButton)
+
+
+
         # icon = QPixmap(10,10)
         # icon.fill(self.seg_colours[0])
         # self.widget_annotation.setCursor(QCursor(icon))
@@ -592,7 +599,14 @@ class MainWindow(QMainWindow):
         self.addToolBar(Qt.TopToolBarArea, self.toolbar_outline)
         
 
+    def show_loading_message(self, text="Loading, please wait..."):
+        self.loading_msg.setText(text)
+        self.loading_msg.show()
+        QApplication.processEvents()  # force UI update
 
+    def hide_loading_message(self):
+        if hasattr(self, "loading_msg") and self.loading_msg:
+            self.loading_msg.hide()
         
     def opendir(self, _value=False, dirpath=None):
         """Open the directory of images
@@ -614,6 +628,9 @@ class MainWindow(QMainWindow):
 
             # if temp and temp != self.work_dir:
             if temp:    
+                
+                self.show_loading_message("Loading images, please wait...")
+                
                 self.work_dir = temp
                 
                 # clean the self.data
@@ -626,10 +643,13 @@ class MainWindow(QMainWindow):
                 # self.widget_folder_label.setText("Image Dir: {}\nAnnotation file: {}".format(os.path.abspath(self.data.work_dir),os.path.abspath(self.data.file_name)))
                 self.widget_folder_label.setText("Image Dir: {}\n{} images".format(os.path.abspath(self.data.work_dir),len(self.data.img_id_order)))
                 
+                self.hide_loading_message()
+                
                 # self.widget_folder_label.setText("Image Dir: {}".format(os.path.abspath(self.data.work_dir)))
                 QMessageBox.about(self, "Directory opened successfully", "{} images are imported".format(len(self.data.img_id_order)))
         except Exception as e:
             print(e)
+            
 
     def open_annotations(self):
         """Open the labelling progress file.json file.
@@ -647,6 +667,8 @@ class MainWindow(QMainWindow):
                 file_name, _ = QFileDialog.getOpenFileName(self, 'Open Labelling Progress', defaultOpenDirPath,
                                                         'Files (*.json)', options=options)
                 if file_name:
+                    self.show_loading_message("Loading Labelling Progress, please wait...")
+                    
                     file_name = os.path.abspath(file_name)
                     _, extension = os.path.splitext(file_name)
                     if extension == ".json":
@@ -655,6 +677,7 @@ class MainWindow(QMainWindow):
                         self.list_review_assist()
                         self.list_file_names()
 
+     
                     # if self.data.work_dir is None:
                     #     self.widget_folder_label.setText("Image Dir: {}\nAnnotation file: {}".format("",os.path.abspath(self.data.file_name)))
                     # else:
@@ -670,7 +693,9 @@ class MainWindow(QMainWindow):
 
         except Exception as e:
             print(e)
-
+        finally:
+            self.hide_loading_message()
+                    
 
 
     def undo(self):
@@ -710,6 +735,7 @@ class MainWindow(QMainWindow):
         #     self.data.no_anno_file = False
 
         try:
+            self.show_loading_message("Saving Labelling Progress, please wait...")
             if self.data.has_anno_file:
                 self.data.write_json()
             else:
@@ -722,6 +748,9 @@ class MainWindow(QMainWindow):
             # self.widget_anno_file_label.setText("Annotation file: {}".format(self.data.file_name))
         except Exception as e:
             print(e)
+        finally:
+            self.hide_loading_message()
+            self.data.changed = False
             
             
     def save_as(self):
@@ -739,6 +768,8 @@ class MainWindow(QMainWindow):
                 
 
         # self.widget_anno_file_label.setText("Annotation file: {}".format(self.data.file_name))
+
+
 
 
     def import_csv(self, mode):
@@ -766,7 +797,9 @@ class MainWindow(QMainWindow):
                     if extension =='.csv':
                         self.file_name_temp_for_csv = file_name
                         self.check_csv(file_name)
-                                                                 
+                         
+                        self.show_loading_message("Importing CSV, please wait...")
+                
                         df_data = pd.read_csv(file_name, index_col='file')
                         has_na= df_data.isnull().values.any()
                         df_data = df_data.fillna(np.nan).replace([np.nan], [None])
@@ -781,7 +814,6 @@ class MainWindow(QMainWindow):
                             self.data.import_pts(df_data)
                             
                         # deprecated function     
-                        # self.show_input_csv_detail(df_data)
 
                     self.data.changed=True
                     self.list_review_assist()
@@ -791,7 +823,10 @@ class MainWindow(QMainWindow):
             print(e)
             
             QMessageBox.warning(self,"Import Warning" , str(e))
-
+        finally:
+            self.hide_loading_message()
+            self.data.changed = False
+        
     def import_img_seg(self):
         """Open a directory and import images that have the same names from data images as the segmentation
         """        
@@ -956,12 +991,19 @@ class MainWindow(QMainWindow):
         if self.data.work_dir==None:
             QMessageBox.about(self, "No image data", "Can not export without image data")
         elif self.data:
-            current_dir = self.data.work_dir
-            save_path, _ = QFileDialog.getSaveFileName(self, 'Export annotations as CSV',current_dir,"CSV (*.csv)")
-            # Save the file only path is selected
-            if save_path:
-                self.data.write_csv(save_path, mode)
-    
+            try:
+                current_dir = self.data.work_dir
+                save_path, _ = QFileDialog.getSaveFileName(self, 'Export annotations as CSV',current_dir,"CSV (*.csv)")
+                # Save the file only path is selected
+                if save_path:
+                    self.show_loading_message("Exporting CSV, please wait...")
+                    self.data.write_csv(save_path, mode)
+            except Exception as e:           
+                QMessageBox.warning(self,"Export CSV Warning" , str(e))
+                
+            finally:
+                self.hide_loading_message()    
+                
     def export_mask(self):
         """Select a folder and save masks as images to the folder
         """   
@@ -977,10 +1019,13 @@ class MainWindow(QMainWindow):
                                                                 QFileDialog.ShowDirsOnly | QFileDialog.DontResolveSymlinks))
 
                 if dir:
+                    self.show_loading_message("Exporting masks, please wait...")
                     self.data.write_mask(dir)
 
             except Exception as e:           
                 QMessageBox.warning(self,"Export Warning" , str(e))
+            finally:
+                self.hide_loading_message()
             
     def mode_choosing(self):
         """view, point or seg modes
@@ -1322,10 +1367,12 @@ class MainWindow(QMainWindow):
             self.data.set_image_id(img_id)
 
             if self.act_quick_label_mode.isChecked():
-                while len(self.data.get_current_image_segments_cv())< len(self.current_quick_segs):
-                    name = self.current_quick_segs[len(self.data.get_current_image_segments_cv())]
+                # adding segmentation classes from quick label mode to current image.
+                # while len(self.data.get_current_image_segments_cv())< len(self.current_quick_segs):
+                # name = self.current_quick_segs[len(self.data.get_current_image_segments_cv())]
+                # self.data.add_seg_for_current_img(name)
+                for name in self.current_quick_segs:
                     self.data.add_seg_for_current_img(name)
-
 
 
             self.widget_annotation.reset_mask(reset_data_current_mask= True)
