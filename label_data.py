@@ -570,6 +570,8 @@ class Data():
                     if row[col]!=None:
                         # contours = 
                         seg_dict[col]= {"contours" : eval(row[col])}
+                    else:
+                        seg_dict[col]= {"contours" : []}
                         # seg_dict[col]["contours"] = eval(row[col])
                     self.add_seg_map_for_give_img(col , idx)
                 self.images[idx].segments_cv = seg_dict

@@ -414,7 +414,15 @@ class MainWindow(QMainWindow):
         self.loading_msg.setText("")
         self.loading_msg.setStandardButtons(QMessageBox.NoButton)
 
+        screen = QGuiApplication.primaryScreen().availableGeometry()
+        w = int(screen.width() * 0.9)
+        h = int(screen.height() * 0.9)
 
+        self.resize(w, h)
+        self.move(
+            screen.left() + (screen.width() - w) // 2,
+            screen.top() + (screen.height() - h) // 2
+        )
 
         # icon = QPixmap(10,10)
         # icon.fill(self.seg_colours[0])
