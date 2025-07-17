@@ -168,6 +168,14 @@ PhenoTrain provides an intuitive interface for using Deep Learning.\
 The window when PhenoTrain starts![Main view](./assets/train.png)
 
 
+PhenoTrain also provides a command line interface to train models.\
+Use `python phenotrain_cli.py --help` to see the available options.
+For example,
+```bash
+python phenotrain_cli.py train --mode Segmentation --format CSV --csv ./data/demo/seg.csv --img-dir ./data/demo/bird_10 --scale 100 --lr 0.001 --batch 1 --epochs 10 --test-percent 20 --train-level 1
+```
+
+
 ## Get demo datasets
 
 **1. 10 Bird images**
